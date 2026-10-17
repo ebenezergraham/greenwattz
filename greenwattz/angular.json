@@ -6,7 +6,7 @@
   },
   "newProjectRoot": "projects",
   "projects": {
-    "sunsorted": {
+    "greenwattz": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
@@ -74,10 +74,10 @@
           "builder": "@angular/build:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "sunsorted:build:production"
+              "buildTarget": "greenwattz:build:production"
             },
             "development": {
-              "buildTarget": "sunsorted:build:development"
+              "buildTarget": "greenwattz:build:development"
             }
           },
           "defaultConfiguration": "development"

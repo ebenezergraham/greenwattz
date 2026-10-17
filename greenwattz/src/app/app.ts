@@ -2,7 +2,7 @@ import { Component, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { SITE } from './core/site';
 
-const KEY = 'sunsorted.consent.v1';
+const KEY = 'greenwattz.consent.v1';
 
 @Component({
   selector: 'app-root',
@@ -11,9 +11,9 @@ const KEY = 'sunsorted.consent.v1';
     <a class="skip" href="#main">Skip to content</a>
     <header class="nav">
       <div class="wrap bar">
-        <a routerLink="/" class="brand" aria-label="SunSorted home">
+        <a routerLink="/" class="brand" aria-label="GreenWattz home">
           <img src="favicon.svg" alt="" width="30" height="30" />
-          <span>SunSorted</span>
+          <span>GreenWattz</span>
         </a>
         <nav aria-label="Main">
           <a routerLink="/plan" routerLinkActive="on">Plan</a>
@@ -28,7 +28,7 @@ const KEY = 'sunsorted.consent.v1';
     <footer>
       <div class="wrap foot">
         <div>
-          <b>SunSorted</b>
+          <b>GreenWattz</b>
           <p class="muted small">Independent solar planning for Irish homes. Everything is calculated in your browser. Your data never leaves your device.</p>
         </div>
         <div class="links">
@@ -49,7 +49,7 @@ const KEY = 'sunsorted.consent.v1';
         <div>
           <b id="cb-t">Cookies and storage</b>
           <p class="small">
-            SunSorted sets no tracking or advertising cookies. We only remember this choice
+            GreenWattz sets no tracking or advertising cookies. We only remember this choice
             on this device. <a routerLink="/cookies">Read the cookie policy</a>.
           </p>
         </div>

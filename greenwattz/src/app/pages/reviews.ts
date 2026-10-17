@@ -149,7 +149,7 @@ const TOPICS = [
               <div class="val"><b class="num">{{ g.rating | number: '1.1-1' }}</b><span class="muted num">out of 5 from {{ g.count | number }} reviews</span></div>
               <p class="small muted">Read on {{ date(g.asOf) }}</p>
             } @else {
-              <p class="muted">Not yet added to SunSorted. Check the current rating directly.</p>
+              <p class="muted">Not yet added to GreenWattz. Check the current rating directly.</p>
             }
             <a class="btn sm" [href]="maps()" target="_blank" rel="noopener noreferrer">Open Google Maps</a>
           </div>
@@ -168,10 +168,10 @@ const TOPICS = [
           <li>Check the installer is on the <a href="https://www.seai.ie/grants/home-energy-grants/solar-electricity-grant/" target="_blank" rel="noopener">SEAI registered installer list</a> if you want the grant.</li>
           <li>Look at how recent the reviews are and whether the company replies to negative ones.</li>
           <li>Ask what happens when an inverter or battery fails, and who you call.</li>
-          <li>Get at least three written quotes and compare the savings each one promises with the figures from your SunSorted plan.</li>
+          <li>Get at least three written quotes and compare the savings each one promises with the figures from your GreenWattz plan.</li>
         </ul>
         <div class="row"><a class="btn primary" routerLink="/plan">Plan my solar</a>@if (inst.slug === 'pvgen') { <a class="btn" routerLink="/pvgen">PVGen introductions</a> }</div>
-        <p class="small muted">Ratings belong to Trustpilot and Google and are shown for information. SunSorted is not affiliated with Trustpilot or Google.</p>
+        <p class="small muted">Ratings belong to Trustpilot and Google and are shown for information. GreenWattz is not affiliated with Trustpilot or Google.</p>
       </div>
     } @else {
       <div class="narrow page"><h1>Installer not found</h1><a class="btn" routerLink="/reviews">Back to reviews</a></div>

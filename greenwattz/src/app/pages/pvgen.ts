@@ -10,7 +10,7 @@ import { SITE } from '../core/site';
       <h1>Considering PVGen?</h1>
       <p class="lead">If you decide on PVGen, an existing PVGen customer can introduce you through the company's own referral process.</p>
 
-      <div class="notice"><i class="ph ph-handshake"></i><span><b>Disclosure.</b> The person behind SunSorted is a PVGen customer and may receive a benefit from PVGen if someone they introduce becomes a customer. SunSorted is otherwise independent and PVGen does not pay for placement or reviews.</span></div>
+      <div class="notice"><i class="ph ph-handshake"></i><span><b>Disclosure.</b> The person behind GreenWattz is a PVGen customer and may receive a benefit from PVGen if someone they introduce becomes a customer. GreenWattz is otherwise independent and PVGen does not pay for placement or reviews.</span></div>
 
       <div class="card">
         <h3>How an introduction works</h3>
@@ -27,7 +27,7 @@ import { SITE } from '../core/site';
         <h3>Request an introduction</h3>
         <div class="field"><label for="n">Your name</label><input id="n" name="name" type="text" required autocomplete="name" /></div>
         <div class="field"><label for="c">County</label><input id="c" name="county" type="text" required autocomplete="address-level1" /></div>
-        <div class="field"><label for="m">Anything you would like us to know (optional)</label><textarea id="m" name="msg"></textarea><span class="hint">For example your planned system size from the SunSorted planner.</span></div>
+        <div class="field"><label for="m">Anything you would like us to know (optional)</label><textarea id="m" name="msg"></textarea><span class="hint">For example your planned system size from the GreenWattz planner.</span></div>
         <label class="check"><input type="checkbox" name="consent" required /><span>I agree that the details I enter are put into an email to {{ site.contactEmail }} so someone can arrange an introduction. See the <a routerLink="/privacy">privacy policy</a>.</span></label>
         @if (err()) { <p class="err" role="alert">{{ err() }}</p> }
         <button class="btn primary" type="submit">Open email to request</button>

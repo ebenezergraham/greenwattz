@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "public": "dist/sunsorted/browser",
+    "public": "dist/greenwattz/browser",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [{ "source": "**", "destination": "/index.html" }],
     "headers": [

@@ -1,5 +1,5 @@
 /**
- * SunSorted calculation engine. Pure functions, runs entirely in the browser.
+ * GreenWattz calculation engine. Pure functions, runs entirely in the browser.
  * All assumptions are exposed in `Assumptions` so the user can change them.
  * Figures are planning estimates for Ireland, not a quote.
  */

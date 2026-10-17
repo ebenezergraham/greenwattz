@@ -1,4 +1,4 @@
-# SunSorted
+# GreenWattz
 
 Angular 22 solar planner for Irish homes. 100% client-side: no backend, no data sent anywhere.
 
@@ -14,4 +14,4 @@ Angular 22 solar planner for Irish homes. 100% client-side: no backend, no data 
     firebase projects:create <your-project-id>   # then update .firebaserc
     npx ng build && firebase deploy --only hosting
 
-Buy the domain (sunsorted.eu was unregistered when checked on 17 Oct 2026), then connect it in Firebase Console > Hosting > Add custom domain.
+Buy the domain (greenwattz.eu was unregistered when checked on 17 Oct 2026), then connect it in Firebase Console > Hosting > Add custom domain.

@@ -48,11 +48,11 @@ export class PrivacyPage { readonly site = SITE; }
     <article class="narrow doc">
       <h1>Cookie policy</h1>
       <p class="muted">Last updated {{ site.lastUpdated }}.</p>
-      <p>SunSorted sets <b>no tracking, analytics or advertising cookies</b>. We use your browser's local storage for one small thing only:</p>
+      <p>GreenWattz sets <b>no tracking, analytics or advertising cookies</b>. We use your browser's local storage for one small thing only:</p>
       <table>
         <thead><tr><th>Name</th><th>Purpose</th><th>Type</th><th>Kept</th></tr></thead>
         <tbody>
-          <tr><td>sunsorted.consent.v1</td><td>Remembers your answer to the cookie notice.</td><td>Strictly necessary</td><td>Until you clear site data</td></tr>
+          <tr><td>greenwattz.consent.v1</td><td>Remembers your answer to the cookie notice.</td><td>Strictly necessary</td><td>Until you clear site data</td></tr>
         </tbody>
       </table>
       <p>Because these are strictly necessary or requested by you, they do not need consent under the ePrivacy rules. If we add analytics or other optional storage in future, we will ask first and update this page.</p>
