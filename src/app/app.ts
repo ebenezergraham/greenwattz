@@ -19,7 +19,7 @@ const KEY = 'greenwattz.consent.v1';
           <a routerLink="/plan" routerLinkActive="on">Plan</a>
           <a routerLink="/guide/esb-data" routerLinkActive="on">Meter data</a>
           <a routerLink="/reviews" routerLinkActive="on">Reviews</a>
-          <a routerLink="/pvgen" routerLinkActive="on">PVGen</a>
+          <a routerLink="/quote" routerLinkActive="on">Get quotes</a>
         </nav>
         <a routerLink="/plan" class="btn primary sm">Start planning</a>
       </div>
@@ -40,7 +40,7 @@ const KEY = 'greenwattz.consent.v1';
       </div>
       <div class="wrap small muted legal">
         Estimates only, not a quotation or financial advice. Grant and tariff figures change, so check
-        <a href="https://www.seai.ie/grants/home-energy-grants/solar-electricity-grant/" target="_blank" rel="noopener">SEAI</a> and your supplier before you decide.
+        <a href="https://www.seai.ie/grants/home-energy-grants/individual-grants/solar-electricity-grant" target="_blank" rel="noopener">SEAI</a> and your supplier before you decide.
       </div>
     </footer>
 

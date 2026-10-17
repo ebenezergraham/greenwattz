@@ -3,7 +3,7 @@ import { HomePage } from './pages/home';
 import { PlanPage } from './pages/plan';
 import { GuidePage } from './pages/guide';
 import { ProviderPage, ReviewsPage } from './pages/reviews';
-import { PvgenPage } from './pages/pvgen';
+import { QuotePage } from './pages/quote';
 import { CookiesPage, PrivacyPage } from './pages/legal';
 
 export const routes: Routes = [
@@ -12,7 +12,7 @@ export const routes: Routes = [
   { path: 'guide/esb-data', component: GuidePage, title: 'Get your ESB smart meter data | GreenWattz' },
   { path: 'reviews', component: ReviewsPage, title: 'Solar installer reviews | GreenWattz' },
   { path: 'reviews/:slug', component: ProviderPage, title: 'Installer reviews | GreenWattz' },
-  { path: 'pvgen', component: PvgenPage, title: 'PVGen introductions | GreenWattz' },
+  { path: 'quote', component: QuotePage, title: 'Find installers | GreenWattz' },
   { path: 'privacy', component: PrivacyPage, title: 'Privacy policy | GreenWattz' },
   { path: 'cookies', component: CookiesPage, title: 'Cookie policy | GreenWattz' },
   { path: '**', redirectTo: '' },

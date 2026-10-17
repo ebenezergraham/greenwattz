@@ -20,7 +20,7 @@ import { SITE } from '../core/site';
       <ul>
         <li><b>Planner inputs and meter files:</b> processed in memory in your browser only. Closing or reloading the page clears them. We do not receive them.</li>
         <li><b>Installer ratings:</b> the ratings pages show scores from Trustpilot and Google that we collected in advance. Your browser does not contact Trustpilot or Google until you click a link to them, and their own privacy policies apply from then on.</li>
-        <li><b>Introduction requests:</b> if you use the PVGen introduction form, it opens an email in your own email app containing the details you entered. We receive it only if you send it. We use it to arrange the introduction and delete it afterwards unless you ask us to keep it.</li>
+        <li><b>Introduction requests:</b> if you choose to request an introduction to an existing customer of an installer, the form opens an email in your own email app containing the details you entered. We receive it only if you send it. We use it to arrange the introduction and delete it afterwards unless you ask us to keep it.</li>
         <li><b>Hosting logs:</b> our host, Google Firebase Hosting, processes technical data such as IP address and user agent to deliver and secure the site. See Google's Firebase privacy information.</li>
       </ul>
 
@@ -28,7 +28,7 @@ import { SITE } from '../core/site';
       <p>For introduction requests we rely on your consent, which you give by ticking the box and sending the email. For hosting security we rely on our legitimate interest in running a secure website.</p>
 
       <h2>Sharing</h2>
-      <p>We do not sell personal data and do not use advertising or analytics trackers. If you ask for a PVGen introduction, we pass your name and county to an existing PVGen customer for that purpose only, and PVGen will receive your details if you proceed.</p>
+      <p>We do not sell personal data and do not use advertising or analytics trackers. If you ask for an introduction to an existing customer of an installer, we pass your name and county to that customer for that purpose only, and the installer will receive your details if you proceed.</p>
 
       <h2>Your rights</h2>
       <p>Under the GDPR you can ask to access, correct or delete your data, object to processing, or withdraw consent at any time by emailing us. You can complain to the Data Protection Commission at <a href="https://www.dataprotection.ie" target="_blank" rel="noopener">dataprotection.ie</a>.</p>

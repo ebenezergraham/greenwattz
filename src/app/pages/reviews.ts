@@ -1,21 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
-import ratings from '../data/installer-ratings.json';
-
-interface Source { score?: number; rating?: number; count: number; url: string; asOf: string }
-interface Installer { slug: string; name: string; kind: string; domain: string; trustpilot: Source | null; google: Source | null }
-
-const ALL: Installer[] = (ratings as { installers: Installer[] }).installers;
-const AS_OF: string = (ratings as { asOf: string }).asOf;
-
-/** Pulls small samples toward the market average so 4.9 from 20 reviews does not outrank 4.7 from 3,000. */
-const PRIOR_N = 100, PRIOR_MEAN = 4.4;
-function adjusted(score: number, count: number): number {
-  return (count * score + PRIOR_N * PRIOR_MEAN) / (count + PRIOR_N);
-}
-const mapsUrl = (i: Installer) => i.google?.url ?? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(i.name + ' Ireland')}`;
-const dateFmt = (iso: string) => new Date(iso).toLocaleDateString('en-IE', { day: 'numeric', month: 'short', year: 'numeric' });
+import { ALL, Installer, adjusted, dateFmt, mapsUrl, AS_OF } from '../core/installers';
 
 type Sort = 'adjusted' | 'score' | 'count' | 'name';
 
@@ -165,12 +151,12 @@ const TOPICS = [
 
         <h2>Before you sign</h2>
         <ul class="tips">
-          <li>Check the installer is on the <a href="https://www.seai.ie/grants/home-energy-grants/solar-electricity-grant/" target="_blank" rel="noopener">SEAI registered installer list</a> if you want the grant.</li>
+          <li>Check the installer is on the <a href="https://www.seai.ie/grants/find-a-registered-professional/solar-pv-companies" target="_blank" rel="noopener">SEAI registered installer list</a> if you want the grant.</li>
           <li>Look at how recent the reviews are and whether the company replies to negative ones.</li>
           <li>Ask what happens when an inverter or battery fails, and who you call.</li>
           <li>Get at least three written quotes and compare the savings each one promises with the figures from your GreenWattz plan.</li>
         </ul>
-        <div class="row"><a class="btn primary" routerLink="/plan">Plan my solar</a>@if (inst.slug === 'pvgen') { <a class="btn" routerLink="/pvgen">PVGen introductions</a> }</div>
+        <div class="row"><a class="btn primary" routerLink="/plan">Plan my solar</a></div>
         <p class="small muted">Ratings belong to Trustpilot and Google and are shown for information. GreenWattz is not affiliated with Trustpilot or Google.</p>
       </div>
     } @else {

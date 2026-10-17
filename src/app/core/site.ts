@@ -8,3 +8,9 @@ export const SITE = {
   operator: '[Your legal name or company], Ireland',
   lastUpdated: '17 October 2026',
 };
+
+/**
+ * When an installer in this list is chosen in the quote flow, we ask whether the user would like an
+ * introduction from an existing customer. Keep to installers whose referral rules allow it.
+ */
+export const INTRODUCTION_INSTALLERS = ['pvgen'];

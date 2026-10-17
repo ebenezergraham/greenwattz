@@ -216,17 +216,10 @@
           }
         </div>
 
-        <div class="grid2 top">
-          <div class="card">
-            <h3>Next: get real quotes</h3>
-            <p class="muted">Quote comparison is coming soon. Until then, take this plan to at least three SEAI-registered installers and ask each to explain their savings estimate.</p>
-            <div class="row top"><button class="btn" type="button" disabled>Compare quotes, coming soon</button><button class="btn" type="button" (click)="print()"><i class="ph ph-printer"></i> Save as PDF</button></div>
-          </div>
-          <div class="card">
-            <h3>Thinking about PVGen?</h3>
-            <p class="muted">Existing customers can introduce friends, and it may help you both. See how an introduction works and how to ask for one.</p>
-            <div class="row top"><a class="btn" routerLink="/pvgen">PVGen introductions</a><a class="btn ghost" routerLink="/reviews">Read installer reviews</a></div>
-          </div>
+        <div class="card top">
+          <h3>Next: get quotes</h3>
+          <p class="muted">Tell us what matters most to you and we will shortlist five SEAI-registered installers to ask for a quote.</p>
+          <div class="row top"><a class="btn primary" routerLink="/quote">Find my installers</a><button class="btn" type="button" (click)="print()"><i class="ph ph-printer"></i> Save as PDF</button><a class="btn ghost" routerLink="/reviews">Read installer ratings</a></div>
         </div>
         <p class="small muted top">These are modelled estimates using a typical day for each month, not a quotation. Actual results vary with weather, installation, tariff changes and how you use power.</p>
       }

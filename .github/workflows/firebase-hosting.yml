@@ -3,12 +3,9 @@ name: Deploy to Firebase Hosting
 on:
   push:
     branches: [main]
-  pull_request:
 
 permissions:
   contents: read
-  checks: write
-  pull-requests: write
 
 jobs:
   deploy:
@@ -23,7 +20,6 @@ jobs:
       - run: npx ng build
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          channelId: ${{ github.event_name == 'push' && 'live' || '' }}
+          channelId: live
           projectId: greenwattz-eu
