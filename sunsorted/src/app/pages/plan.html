@@ -1,0 +1,254 @@
+<div class="wrap plan">
+  <ol class="stepper no-print" aria-label="Progress">
+    @for (t of steps; track t; let i = $index) {
+      <li>
+        <button type="button" [class.on]="step() === i" [class.done]="step() > i" [attr.aria-current]="step() === i ? 'step' : null" (click)="go(i)">
+          <span class="dot">{{ i + 1 }}</span><span class="t">{{ t }}</span>
+        </button>
+      </li>
+    }
+  </ol>
+
+  <div class="layout">
+    <section class="main">
+      <!-- STEP 1 -->
+      @if (step() === 0) {
+        <h1>Tell us about your home</h1>
+        <p class="muted lead">Four quick questions. Nothing here is saved or sent anywhere.</p>
+
+        <div class="stack">
+          <div class="field">
+            <span class="lbl" id="occ">When is someone usually home?</span>
+            <div class="opt-grid" role="group" aria-labelledby="occ">
+              <button class="opt" type="button" [attr.aria-pressed]="s.home().occupancy === 'away'" (click)="setOcc('away')"><b>Out most of the day</b><span>Work or school, home from about 5pm</span></button>
+              <button class="opt" type="button" [attr.aria-pressed]="s.home().occupancy === 'mixed'" (click)="setOcc('mixed')"><b>Some of the day</b><span>Part-time, shifts, or someone at home</span></button>
+              <button class="opt" type="button" [attr.aria-pressed]="s.home().occupancy === 'home'" (click)="setOcc('home')"><b>Home most days</b><span>Remote work, retired, or young children</span></button>
+            </div>
+          </div>
+
+          <div class="field">
+            <span class="lbl" id="ori">Which way does your best roof face?</span>
+            <div class="opt-grid" role="group" aria-labelledby="ori">
+              <button class="opt" type="button" [attr.aria-pressed]="s.home().orientation === 'S'" (click)="setOri('S')"><b>South</b><span>Best output</span></button>
+              <button class="opt" type="button" [attr.aria-pressed]="s.home().orientation === 'SE_SW'" (click)="setOri('SE_SW')"><b>South-east or south-west</b><span>About 5% less</span></button>
+              <button class="opt" type="button" [attr.aria-pressed]="s.home().orientation === 'E_W'" (click)="setOri('E_W')"><b>East or west</b><span>About 18% less, spreads output</span></button>
+              <button class="opt" type="button" [attr.aria-pressed]="s.home().orientation === 'N'" (click)="setOri('N')"><b>North</b><span>Poor, not usually advised</span></button>
+            </div>
+          </div>
+
+          <div class="field">
+            <span class="lbl" id="shade">Shade on that roof</span>
+            <div class="seg" role="group" aria-labelledby="shade">
+              <button type="button" [attr.aria-pressed]="s.home().shading === 'none'" (click)="setShade('none')">Little or none</button>
+              <button type="button" [attr.aria-pressed]="s.home().shading === 'some'" (click)="setShade('some')">Some</button>
+              <button type="button" [attr.aria-pressed]="s.home().shading === 'heavy'" (click)="setShade('heavy')">A lot</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="roof">Usable roof area: <b class="num">{{ s.home().roofAreaM2 }} m²</b></label>
+            <input id="roof" type="range" min="8" max="70" step="1" [value]="s.home().roofAreaM2" (input)="setRoof($event)" />
+            <span class="hint">Room for about {{ s.maxPanels() }} panels. A typical semi-detached roof has 20 to 35 m² facing one way.</span>
+          </div>
+
+          <div class="field">
+            <span class="lbl">Planning to add soon?</span>
+            <label class="check"><input type="checkbox" [checked]="s.home().addEv" (change)="s.patchHome({ addEv: $any($event.target).checked })" /><span>An electric car <span class="muted small">(adds about 2,600 kWh a year, mostly overnight)</span></span></label>
+            <label class="check"><input type="checkbox" [checked]="s.home().addHeatPump" (change)="s.patchHome({ addHeatPump: $any($event.target).checked })" /><span>A heat pump <span class="muted small">(adds about 3,500 kWh a year, mostly winter)</span></span></label>
+          </div>
+        </div>
+      }
+
+      <!-- STEP 2 -->
+      @if (step() === 1) {
+        <h1>How much electricity do you use?</h1>
+        <p class="muted lead">The more accurate this is, the better your plan. Smart meter data is best because it shows when you use power, not just how much.</p>
+
+        <div class="seg modes" role="group" aria-label="How do you want to tell us?">
+          <button type="button" [attr.aria-pressed]="s.mode() === 'meter'" (click)="setMode('meter')">Upload meter data</button>
+          <button type="button" [attr.aria-pressed]="s.mode() === 'annual'" (click)="setMode('annual')">I know my kWh</button>
+          <button type="button" [attr.aria-pressed]="s.mode() === 'bill'" (click)="setMode('bill')">Use my bill</button>
+        </div>
+
+        <div class="stack top">
+          @if (s.mode() === 'meter') {
+            <div class="card">
+              <h3>Upload your ESB Networks file</h3>
+              <p class="muted small">Download the "30-minute readings in kWh" file from your ESB Networks account. <a routerLink="/guide/esb-data">Step-by-step guide</a>.</p>
+              <div class="drop">
+                <label for="hdf" class="btn"><i class="ph ph-upload-simple"></i> Choose CSV file</label>
+                <input id="hdf" class="sr" type="file" accept=".csv,text/csv" (change)="onFile($event)" />
+                @if (fileName()) { <span class="small"><i class="ph ph-check-circle"></i> {{ fileName() }}</span> <button class="btn ghost sm" type="button" (click)="clearFile()">Remove</button> }
+              </div>
+              <p class="small muted"><i class="ph ph-lock-key"></i> The file is read inside your browser and never uploaded.</p>
+              @if (fileError()) { <p class="err" role="alert">{{ fileError() }}</p> }
+              @if (s.meterUsage(); as m) { <div class="notice info"><i class="ph ph-info"></i><span>{{ m.coverage }}</span></div> }
+              @if (!s.meterUsage() && !fileError()) { <p class="small muted">No file yet. You can switch to an estimate at any time.</p> }
+            </div>
+          }
+          @if (s.mode() === 'annual') {
+            <div class="field">
+              <label for="kwh">Yearly usage: <b class="num">{{ s.annualKwh() | number }} kWh</b></label>
+              <input id="kwh" type="range" min="1500" max="12000" step="100" [value]="s.annualKwh()" (input)="setAnnual($event)" />
+              <span class="hint">It is on your bill as annual or 12-month usage. The Irish average home uses about 4,200 kWh.</span>
+            </div>
+          }
+          @if (s.mode() === 'bill') {
+            <div class="field">
+              <label for="bill">Average monthly bill: <b class="num">€{{ s.monthlyBill() }}</b></label>
+              <input id="bill" type="range" min="50" max="400" step="5" [value]="s.monthlyBill()" (input)="setBill($event)" />
+              <span class="hint">We remove about €35 a month of standing charges and levies, then convert to kWh at your rates. That gives roughly {{ s.baseUsage().annualKwh | number }} kWh a year.</span>
+            </div>
+          }
+          <div class="notice"><i class="ph ph-warning"></i><span>Without meter data, we estimate <i>when</i> you use power from your lifestyle answers. Solar savings depend heavily on that, so treat results as a range.</span></div>
+        </div>
+
+        <h2 class="sub">Your day at a glance</h2>
+        <div class="card">
+          <day-chart [usage]="dayAvg()" />
+          <div class="split">
+            <div><span class="big num">{{ pc(split().nightPct) }}</span><span class="small muted">Night<br />11pm to 8am</span></div>
+            <div><span class="big num">{{ pc(split().daytimePct) }}</span><span class="small muted">Daytime<br />8am to 5pm</span></div>
+            <div><span class="big num">{{ pc(split().eveningPct) }}</span><span class="small muted">Evening<br />5pm to 11pm</span></div>
+          </div>
+          <p class="muted small">About {{ dailyKwh() | number: '1.0-1' }} kWh a day on average. Solar only helps with what you use while the sun is up, so daytime share matters most. A battery moves daytime sunshine into the evening.</p>
+        </div>
+      }
+
+      <!-- STEP 3 -->
+      @if (step() === 2) {
+        <h1>Your solar strategy</h1>
+        <p class="muted lead">We tested every panel and battery combination that fits your roof. Pick a starting point, then adjust.</p>
+
+        <div class="strats">
+          @for (x of s.strategies(); track x.key) {
+            <button type="button" class="strat" [class.best]="x.key === 'best'" [attr.aria-pressed]="isPicked(x)" (click)="pickStrategy(x)">
+              @if (x.key === 'best') { <span class="chip">Recommended</span> }
+              <h3>{{ x.label }}</h3>
+              <p class="muted small">{{ x.blurb }}</p>
+              <div class="kv"><span class="big num">{{ x.kwp | number: '1.1-1' }} kWp</span><span class="small muted">{{ x.panels }} panels{{ x.batteryKwh ? ' + ' + x.batteryKwh + ' kWh battery' : ', no battery' }}</span></div>
+              <dl>
+                <div><dt>Net cost</dt><dd class="num">{{ eur0(x.netCost) }}</dd></div>
+                <div><dt>Payback</dt><dd class="num">{{ payback(x.paybackYears) }}</dd></div>
+                <div><dt>Covers</dt><dd class="num">{{ pc(x.selfSufficiency) }} of usage</dd></div>
+              </dl>
+            </button>
+          }
+        </div>
+
+        <h2 class="sub">Fine-tune</h2>
+        <div class="card stack">
+          <div class="field">
+            <label for="panels">Solar panels: <b class="num">{{ cfg().panels }}</b> <span class="muted">({{ r().kwp | number: '1.2-2' }} kWp, about {{ cfg().panels * s.assumptions().panelAreaM2 }} m² of roof)</span></label>
+            <input id="panels" type="range" min="2" [max]="s.maxPanels()" step="1" [value]="cfg().panels" (input)="setPanels($event)" />
+            <span class="hint">Most Irish homes install 8 to 14 panels (3.5 to 6 kWp). Your roof fits up to {{ s.maxPanels() }}.</span>
+          </div>
+          <div class="field">
+            <span class="lbl" id="bat">Battery size</span>
+            <div class="seg" role="group" aria-labelledby="bat">
+              @for (b of batteryOptions; track b) { <button type="button" [attr.aria-pressed]="cfg().batteryKwh === b" (click)="setBattery(b)">{{ b === 0 ? 'None' : b + ' kWh' }}</button> }
+            </div>
+          </div>
+        </div>
+
+        <h2 class="sub">Do you need a battery?</h2>
+        <div class="card">
+          <p>{{ batteryVerdict().text }}</p>
+          <p class="muted small top">Batteries pay off when you use a lot of power in the evening and overnight and when the price gap between day and night is wide. They also give you cover during outages only if the system is set up for it.</p>
+        </div>
+
+        <h2 class="sub">What this looks like</h2>
+        <div class="grid2">
+          <div class="card"><h3>A June day</h3><p class="muted small bottom">Output against your typical use.</p><day-chart [usage]="juneUsage()" [solar]="solarJune()" label="June day: your usage and solar output by hour" /></div>
+          <div class="card"><h3>Through the year</h3><p class="muted small bottom">Summer surplus, winter shortfall.</p><month-chart [gen]="r().monthlyGen" [demand]="r().monthlyDemand" /></div>
+        </div>
+      }
+
+      <!-- STEP 4 -->
+      @if (step() === 3) {
+        <h1>What it costs and what you get back</h1>
+        <p class="muted lead">{{ r().panels }} panels ({{ r().kwp | number: '1.2-2' }} kWp){{ r().batteryKwh ? ' with a ' + r().batteryKwh + ' kWh battery' : ' and no battery' }}. Adjust on the previous step.</p>
+
+        <div class="cost-hero card raised">
+          <div><span class="small muted">Estimated cost after grant</span><span class="huge num">{{ eur0(r().netCost) }}</span><span class="small muted">Typical installed range {{ eur0(r().grossLow) }} to {{ eur0(r().grossHigh) }} before grant</span></div>
+          <div><span class="small muted">Yearly benefit</span><span class="huge num">{{ eur0(r().annualBenefit) }}</span><span class="small muted">{{ eur0(r().billSaving) }} off your bill + {{ eur0(r().exportIncome) }} export income</span></div>
+          <div><span class="small muted">Pays for itself in</span><span class="huge num">{{ payback(r().paybackYears) }}</span><span class="small muted">Break-even around year {{ s.flow().find(f => f.cumulative >= 0)?.year ?? '25+' }}</span></div>
+        </div>
+
+        <div class="grid2 top">
+          <div class="card">
+            <h3>25 year outlook</h3>
+            <p class="muted small bottom">Cumulative position, including 0.5% yearly panel ageing and {{ pc(s.assumptions().tariffInflation) }} yearly price rises.</p>
+            <cash-chart [points]="s.flow()" />
+          </div>
+          <div class="card">
+            <h3>The numbers</h3>
+            <dl class="rows">
+              <div><dt>Installed cost (mid estimate)</dt><dd class="num">{{ eur0(r().grossCost) }}</dd></div>
+              <div><dt>SEAI grant</dt><dd class="num">{{ r().grant ? '-' + eur(r().grant) : 'Not applied' }}</dd></div>
+              <div><dt>VAT on solar</dt><dd class="num">0%</dd></div>
+              <div class="tot"><dt>You pay</dt><dd class="num">{{ eur0(r().netCost) }}</dd></div>
+              <div><dt>Solar generated</dt><dd class="num">{{ r().generationKwh | number: '1.0-0' }} kWh/yr</dd></div>
+              <div><dt>Used at home</dt><dd class="num">{{ pc(r().selfConsumption) }} of it</dd></div>
+              <div><dt>Exported to the grid</dt><dd class="num">{{ r().exportKwh | number: '1.0-0' }} kWh/yr</dd></div>
+              <div><dt>Share of your usage covered</dt><dd class="num">{{ pc(r().selfSufficiency) }}</dd></div>
+              <div><dt>CO₂ avoided</dt><dd class="num">{{ r().co2Tonnes | number: '1.1-1' }} t/yr</dd></div>
+            </dl>
+          </div>
+        </div>
+
+        <div class="card top">
+          <button class="disclose" type="button" (click)="showAssump.set(!showAssump())" [attr.aria-expanded]="showAssump()">
+            <span><h3>Assumptions you can change</h3><span class="muted small">Prices, tariffs and grant. Edit these to match your latest bill.</span></span>
+            <i class="ph" [class.ph-caret-down]="!showAssump()" [class.ph-caret-up]="showAssump()"></i>
+          </button>
+          @if (showAssump()) {
+            <div class="assump">
+              <div class="field"><label for="a1">Day rate (€/kWh, 8am to 11pm)</label><input id="a1" type="number" step="0.01" [value]="s.assumptions().dayRate" (input)="setAssump('dayRate', num($event))" /></div>
+              <div class="field"><label for="a2">Night rate (€/kWh, 11pm to 8am)</label><input id="a2" type="number" step="0.01" [value]="s.assumptions().nightRate" (input)="setAssump('nightRate', num($event))" /></div>
+              <div class="field"><label for="a3">Export rate (€/kWh)</label><input id="a3" type="number" step="0.01" [value]="s.assumptions().exportRate" (input)="setAssump('exportRate', num($event))" /><span class="hint">Set by each supplier under the Clean Export Guarantee. Check yours.</span></div>
+              <div class="field"><label for="a4">Yearly energy price rise (%)</label><input id="a4" type="number" step="0.5" [value]="s.assumptions().tariffInflation * 100" (input)="setAssump('tariffInflation', pct($event))" /></div>
+              <div class="field"><label for="a5">Installed cost base (€)</label><input id="a5" type="number" step="100" [value]="s.assumptions().panelCostBase" (input)="setAssump('panelCostBase', num($event))" /></div>
+              <div class="field"><label for="a6">Installed cost per kWp (€)</label><input id="a6" type="number" step="50" [value]="s.assumptions().panelCostPerKwp" (input)="setAssump('panelCostPerKwp', num($event))" /></div>
+              <div class="field"><label for="a7">Battery cost per kWh (€)</label><input id="a7" type="number" step="50" [value]="s.assumptions().batteryCostPerKwh" (input)="setAssump('batteryCostPerKwh', num($event))" /></div>
+              <label class="check"><input type="checkbox" [checked]="s.assumptions().seaiGrant" (change)="setAssump('seaiGrant', $any($event.target).checked)" /><span>My home qualifies for the SEAI solar grant <span class="muted small">(generally homes built and occupied before 2021, installer registered with SEAI, approval before work starts)</span></span></label>
+            </div>
+          }
+        </div>
+
+        <div class="grid2 top">
+          <div class="card">
+            <h3>Next: get real quotes</h3>
+            <p class="muted">Quote comparison is coming soon. Until then, take this plan to at least three SEAI-registered installers and ask each to explain their savings estimate.</p>
+            <div class="row top"><button class="btn" type="button" disabled>Compare quotes, coming soon</button><button class="btn" type="button" (click)="print()"><i class="ph ph-printer"></i> Save as PDF</button></div>
+          </div>
+          <div class="card">
+            <h3>Thinking about PVGen?</h3>
+            <p class="muted">Existing customers can introduce friends, and it may help you both. See how an introduction works and how to ask for one.</p>
+            <div class="row top"><a class="btn" routerLink="/pvgen">PVGen introductions</a><a class="btn ghost" routerLink="/reviews">Read installer reviews</a></div>
+          </div>
+        </div>
+        <p class="small muted top">These are modelled estimates using a typical day for each month, not a quotation. Actual results vary with weather, installation, tariff changes and how you use power.</p>
+      }
+
+      <div class="nav-btns no-print">
+        <button class="btn" type="button" [disabled]="step() === 0" (click)="go(step() - 1)"><i class="ph ph-arrow-left"></i> Back</button>
+        @if (step() < 3) { <button class="btn primary" type="button" (click)="go(step() + 1)">Continue <i class="ph ph-arrow-right"></i></button> }
+      </div>
+    </section>
+
+    <aside class="side no-print" aria-label="Plan summary">
+      <div class="card raised">
+        <h3>Your plan so far</h3>
+        <dl class="rows">
+          <div><dt>Yearly usage</dt><dd class="num">{{ s.usage().annualKwh | number: '1.0-0' }} kWh</dd></div>
+          <div><dt>Panels</dt><dd class="num">{{ cfg().panels }} ({{ r().kwp | number: '1.1-1' }} kWp)</dd></div>
+          <div><dt>Battery</dt><dd class="num">{{ cfg().batteryKwh ? cfg().batteryKwh + ' kWh' : 'None' }}</dd></div>
+          <div><dt>You pay</dt><dd class="num">{{ eur0(r().netCost) }}</dd></div>
+          <div><dt>Payback</dt><dd class="num">{{ payback(r().paybackYears) }}</dd></div>
+        </dl>
+        <p class="small muted top"><i class="ph ph-lock-key"></i> Calculated in your browser. Nothing is sent or stored.</p>
+      </div>
+    </aside>
+  </div>
+</div>

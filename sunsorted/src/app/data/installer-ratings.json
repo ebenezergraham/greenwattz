@@ -1,0 +1,253 @@
+{
+  "asOf": "2026-10-17",
+  "note": "Aggregate scores read from public Trustpilot category pages on the date shown. Google ratings are filled by scripts/sync-ratings.mjs.",
+  "installers": [
+    {
+      "slug": "activ8",
+      "name": "Activ8 Solar Energies",
+      "kind": "Solar installer",
+      "domain": "activ8energies.com",
+      "trustpilot": {
+        "score": 4.7,
+        "count": 3272,
+        "url": "https://ie.trustpilot.com/review/activ8energies.com",
+        "asOf": "2026-10-17"
+      },
+      "google": null
+    },
+    {
+      "slug": "pvgen",
+      "name": "PVGen",
+      "kind": "Solar installer",
+      "domain": "pvgeneration.ie",
+      "trustpilot": {
+        "score": 4.7,
+        "count": 1222,
+        "url": "https://ie.trustpilot.com/review/pvgeneration.ie",
+        "asOf": "2026-10-17"
+      },
+      "google": null
+    },
+    {
+      "slug": "solarsmart",
+      "name": "SolarSmart",
+      "kind": "Solar installer",
+      "domain": "solarsmart.ie",
+      "trustpilot": {
+        "score": 4.9,
+        "count": 371,
+        "url": "https://ie.trustpilot.com/review/solarsmart.ie",
+        "asOf": "2026-10-17"
+      },
+      "google": null
+    },
+    {
+      "slug": "spv-energy",
+      "name": "SPV Energy",
+      "kind": "Solar installer",
+      "domain": "spvenergy.ie",
+      "trustpilot": {
+        "score": 4.9,
+        "count": 285,
+        "url": "https://ie.trustpilot.com/review/spvenergy.ie",
+        "asOf": "2026-10-17"
+      },
+      "google": null
+    },
+    {
+      "slug": "asei",
+      "name": "ASEI (All Solar Energies Ireland)",
+      "kind": "Solar installer",
+      "domain": "asei.ie",
+      "trustpilot": {
+        "score": 4.9,
+        "count": 282,
+        "url": "https://ie.trustpilot.com/review/asei.ie",
+        "asOf": "2026-10-17"
+      },
+      "google": null
+    },
+    {
+      "slug": "solar-generation",
+      "name": "Solar Generation",
+      "kind": "Solar installer",
+      "domain": "solargeneration.ie",
+      "trustpilot": {
+        "score": 4.7,
+        "count": 209,
+        "url": "https://ie.trustpilot.com/review/solargeneration.ie",
+        "asOf": "2026-10-17"
+      },
+      "google": null
+    },
+    {
+      "slug": "ohk-energy",
+      "name": "Ohk Energy",
+      "kind": "Solar installer",
+      "domain": "ohkenergy.com",
+      "trustpilot": {
+        "score": 4.5,
+        "count": 327,
+        "url": "https://ie.trustpilot.com/review/ohkenergy.com",
+        "asOf": "2026-10-17"
+      },
+      "google": null
+    },
+    {
+      "slug": "nrg-panel",
+      "name": "NRG Panel",
+      "kind": "Solar installer",
+      "domain": "nrgpanel.ie",
+      "trustpilot": {
+        "score": 4.2,
+        "count": 506,
+        "url": "https://ie.trustpilot.com/review/nrgpanel.ie",
+        "asOf": "2026-10-17"
+      },
+      "google": null
+    },
+    {
+      "slug": "ecoplex",
+      "name": "Ecoplex Energy",
+      "kind": "Solar installer",
+      "domain": "ecoplexenergy.ie",
+      "trustpilot": {
+        "score": 4.3,
+        "count": 461,
+        "url": "https://ie.trustpilot.com/review/ecoplexenergy.ie",
+        "asOf": "2026-10-17"
+      },
+      "google": null
+    },
+    {
+      "slug": "swyft",
+      "name": "Swyft Energy",
+      "kind": "Solar installer",
+      "domain": "swyftenergy.ie",
+      "trustpilot": {
+        "score": 4.1,
+        "count": 415,
+        "url": "https://ie.trustpilot.com/review/swyftenergy.ie",
+        "asOf": "2026-10-17"
+      },
+      "google": null
+    },
+    {
+      "slug": "mysolar",
+      "name": "MySolar",
+      "kind": "Solar installer",
+      "domain": "mysolar.ie",
+      "trustpilot": {
+        "score": 4.8,
+        "count": 158,
+        "url": "https://ie.trustpilot.com/review/mysolar.ie",
+        "asOf": "2026-10-17"
+      },
+      "google": null
+    },
+    {
+      "slug": "gosolar",
+      "name": "Gosolar.ie",
+      "kind": "Solar installer",
+      "domain": "gosolar.ie",
+      "trustpilot": {
+        "score": 4.7,
+        "count": 167,
+        "url": "https://ie.trustpilot.com/review/gosolar.ie",
+        "asOf": "2026-10-17"
+      },
+      "google": null
+    },
+    {
+      "slug": "wizer",
+      "name": "Wizer Energy",
+      "kind": "Solar installer",
+      "domain": "wizerenergy.ie",
+      "trustpilot": {
+        "score": 4.9,
+        "count": 141,
+        "url": "https://ie.trustpilot.com/review/wizerenergy.ie",
+        "asOf": "2026-10-17"
+      },
+      "google": null
+    },
+    {
+      "slug": "ak-solar",
+      "name": "AK Solar",
+      "kind": "Solar installer",
+      "domain": "aksolar.ie",
+      "trustpilot": {
+        "score": 4.9,
+        "count": 144,
+        "url": "https://ie.trustpilot.com/review/aksolar.ie",
+        "asOf": "2026-10-17"
+      },
+      "google": null
+    },
+    {
+      "slug": "jm-energy",
+      "name": "JM Energy Savings",
+      "kind": "Solar installer",
+      "domain": "jmenergy.ie",
+      "trustpilot": {
+        "score": 4.9,
+        "count": 176,
+        "url": "https://ie.trustpilot.com/review/jmenergy.ie",
+        "asOf": "2026-10-17"
+      },
+      "google": null
+    },
+    {
+      "slug": "lvp",
+      "name": "LVP Renewables",
+      "kind": "Solar installer",
+      "domain": "lvprenewables.ie",
+      "trustpilot": {
+        "score": 4.9,
+        "count": 119,
+        "url": "https://ie.trustpilot.com/review/lvprenewables.ie",
+        "asOf": "2026-10-17"
+      },
+      "google": null
+    },
+    {
+      "slug": "westquay",
+      "name": "WestQuay Energy",
+      "kind": "Solar installer",
+      "domain": "westquayenergy.com",
+      "trustpilot": {
+        "score": 4.9,
+        "count": 111,
+        "url": "https://ie.trustpilot.com/review/westquayenergy.com",
+        "asOf": "2026-10-17"
+      },
+      "google": null
+    },
+    {
+      "slug": "irish-supply",
+      "name": "Irish Supply Solar Solutions",
+      "kind": "Solar installer",
+      "domain": "irishsupply.ie",
+      "trustpilot": {
+        "score": 2.2,
+        "count": 539,
+        "url": "https://ie.trustpilot.com/review/irishsupply.ie",
+        "asOf": "2026-10-17"
+      },
+      "google": null
+    },
+    {
+      "slug": "bord-gais",
+      "name": "Bord Gáis Energy",
+      "kind": "Energy supplier with solar",
+      "domain": "bordgaisenergy.ie",
+      "trustpilot": {
+        "score": 4.2,
+        "count": 1138,
+        "url": "https://ie.trustpilot.com/review/bordgaisenergy.ie",
+        "asOf": "2026-10-17"
+      },
+      "google": null
+    }
+  ]
+}
