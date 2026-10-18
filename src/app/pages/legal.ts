@@ -26,7 +26,7 @@ import { SITE } from '../core/site';
             <tr><td>Your results, chosen system, assumptions and installer shortlist</td><td>In the page's memory. Cleared on reload.</td><td><b>No</b></td></tr>
             <tr><td>Your cookie notice choice</td><td>Your browser's local storage on this device.</td><td><b>No</b></td></tr>
             <tr><td>"Copy plan summary" and "Save as PDF"</td><td>Your clipboard or a file you save. We do not see them.</td><td><b>No</b>, unless you paste or send it somewhere</td></tr>
-            <tr><td>Introduction request (name, county, plan summary)</td><td>Opens a draft email in your own email app. Nothing is sent until you press send.</td><td><b>Only if you send it</b>, to {{ site.contactEmail }}</td></tr>
+            <tr><td>Referral request (name, email, county, plan summary)</td><td>Sent when you press the button, through the form service Web3Forms, which emails it to {{ site.contactEmail }}.</td><td><b>Only if you submit it</b>, to Web3Forms and then us</td></tr>
             <tr><td>Technical request data when a page loads: IP address, browser type, pages requested, time</td><td>Logged by our host, Google Firebase Hosting, to deliver and secure the site.</td><td><b>Yes</b>, to our host. Necessary for any website.</td></tr>
             <tr><td>Links to Trustpilot, Google Maps, SEAI, ESB Networks and installer websites</td><td>Nothing is sent when the page loads. If you click a link, that site sees your IP address and that you came from {{ site.domain }}.</td><td><b>Only if you click</b>. Their own privacy policies apply.</td></tr>
           </tbody>
@@ -37,19 +37,22 @@ import { SITE } from '../core/site';
       <h2>What we do not do</h2>
       <ul>
         <li>No advertising, analytics or tracking cookies or scripts.</li>
-        <li>No accounts, and no database of visitors or their plans.</li>
+        <li>No accounts, and no database of visitors or their plans. Referral requests arrive as emails to us.</li>
         <li>We do not sell, rent or share your data.</li>
-        <li>We do not send your details to installers. If you want a quote, you contact them yourself.</li>
+        <li>We do not send your details to installers unless you ask for a referral and agree to it in our conversation. If you want a quote, you contact them yourself.</li>
       </ul>
 
-      <h2>Introductions to existing customers</h2>
-      <p>If you ask for an introduction to an existing customer of an installer, you choose to send us an email with your name, county and plan summary. We use it only to arrange that introduction, pass your name and county to that customer, and delete the email afterwards unless you ask us to keep it. The installer will receive your details if you go ahead. We rely on your consent, which you can withdraw at any time by emailing us.</p>
+      <h2>Referrals</h2>
+      <p>The person behind GreenWattz is a customer of PVGen and receives a reward from PVGen if someone they refer becomes a customer. This does not change your price, and we never ask you for money. If you choose to ask for a referral, you give your name, email, county and a summary of your plan, and tick a consent box. We use them only to contact you once about the referral. We pass your details to PVGen only if you say yes when we talk, and we delete your request within 30 days unless you ask us to keep it or the referral is in progress. Referral requests are not ranked or promoted differently from other installers.</p>
+
+      <h2>Form service</h2>
+      <p>Referral requests are sent through Web3Forms (web3forms.com), which receives the form and emails it to us. They act as our processor and may handle it outside the EEA. See their privacy policy for details. No other part of this site sends your answers anywhere.</p>
 
       <h2>Our host</h2>
       <p>The site is hosted by Google Firebase Hosting. Google acts as our processor for the technical request data above and may process it in countries outside the EEA under its standard contractual safeguards. See Google's Firebase privacy information for details and retention.</p>
 
       <h2>Legal basis</h2>
-      <p>For introduction requests, your consent. For hosting logs and keeping the site secure, our legitimate interest in running a safe website. Storing your cookie choice is strictly necessary.</p>
+      <p>For referral requests, your consent. For hosting logs and keeping the site secure, our legitimate interest in running a safe website. Storing your cookie choice is strictly necessary.</p>
 
       <h2>Changes</h2>
       <p>If we add features that send data off your device, such as a map or address lookup, we will tell you first on the page where it happens, ask before it runs, and update this policy.</p>

@@ -4,6 +4,13 @@ export const SITE = {
   domain: 'greenwattz.eu',
   /** Where "request an introduction" emails go. Set to the address you want to receive them. */
   contactEmail: 'hello@greenwattz.eu',
+  /**
+   * Referral requests are sent through Web3Forms, which emails them to contactEmail. Create a free access key at
+   * https://web3forms.com using that address and paste it here. Access keys are meant to be public.
+   * While this is empty the form falls back to opening a draft email.
+   */
+  formAccessKey: '',
+  formEndpoint: 'https://api.web3forms.com/submit',
   /** Operator details shown in the privacy policy. Replace before launch. */
   operator: '[Your legal name or company], Ireland',
   lastUpdated: '18 October 2026',

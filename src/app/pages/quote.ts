@@ -70,21 +70,23 @@ import { Installer, PRIORITIES, Priority, rank, siteUrl, mapsUrl, seaiMatch } fr
 
           @if (introFor().length) {
             <div class="card intro">
-              <h3>Would you like an introduction to an existing customer?</h3>
-              <p class="muted">You picked {{ introNames() }}. Some of their existing customers can introduce friends through the installer's own referral process.</p>
-              <div class="notice info"><i class="ph ph-handshake"></i><span><b>Disclosure.</b> The person behind GreenWattz is a customer of {{ introNames() }} and may receive a benefit from them if someone they introduce becomes a customer. We never ask you for money, gifts or donations for an introduction, and an introduction does not change how installers are ranked.</span></div>
-              <div class="seg two" role="group" aria-label="Introduction choice">
-                <button type="button" [attr.aria-pressed]="wantsIntro() === true" (click)="wantsIntro.set(true)">Yes, introduce me</button>
+              <h3>Would you like a referral to {{ introNames() }}?</h3>
+              <div class="notice info"><i class="ph ph-handshake"></i><span><b>Disclosure.</b> The person behind GreenWattz is a customer of {{ introNames() }} and gets a reward from them if you become a customer through their referral. It does not change your price. We never ask you for money, and a referral does not change how installers are ranked.</span></div>
+              <div class="seg two" role="group" aria-label="Referral choice">
+                <button type="button" [attr.aria-pressed]="wantsIntro() === true" (click)="wantsIntro.set(true)">Yes, refer me</button>
                 <button type="button" [attr.aria-pressed]="wantsIntro() === false" (click)="wantsIntro.set(false)">No thanks</button>
               </div>
-              @if (wantsIntro()) {
+              @if (sent()) {
+                <p class="ok" role="status"><i class="ph-fill ph-check-circle"></i> Thanks. We have your request and will email you from {{ site.contactEmail }} to talk it through. You are not committed to anything.</p>
+              } @else if (wantsIntro()) {
                 <form class="form" (submit)="sendIntro($event)">
                   <div class="field"><label for="n">Your name</label><input id="n" name="name" type="text" required autocomplete="name" /></div>
+                  <div class="field"><label for="em">Email</label><input id="em" name="email" type="email" required autocomplete="email" /></div>
                   <div class="field"><label for="c">County</label><input id="c" name="county" type="text" required autocomplete="address-level1" /></div>
-                  <label class="check"><input type="checkbox" name="consent" required /><span>I agree that these details, and my plan summary, are put into an email to {{ site.contactEmail }} so someone can arrange an introduction. See the <a routerLink="/privacy">privacy policy</a>.</span></label>
+                  <input type="checkbox" name="botcheck" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true" />
+                  <label class="check"><input type="checkbox" name="consent" required /><span>I agree that my name, email, county and plan summary are sent to the person behind GreenWattz, through the form service Web3Forms, so they can contact me once about a referral. My details go to {{ introNames() }} only if I say yes in that conversation. See the <a routerLink="/privacy">privacy policy</a>.</span></label>
                   @if (err()) { <p class="err" role="alert">{{ err() }}</p> }
-                  <button class="btn primary" type="submit">Open email to request</button>
-                  <p class="small muted">Nothing is sent until you press send in your email app.</p>
+                  <button class="btn primary" type="submit" [disabled]="sending()">{{ sending() ? 'Sending' : 'Request a referral' }}</button>
                 </form>
               }
             </div>
@@ -142,6 +144,8 @@ import { Installer, PRIORITIES, Priority, rank, siteUrl, mapsUrl, seaiMatch } fr
     .seg.two { max-width: 420px; }
     .form { display: grid; gap: 18px; margin-top: 4px; }
     .err { color: var(--bad); font-weight: 600; }
+    .ok { color: var(--ink); font-weight: 600; i { color: var(--link); } }
+    .hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
     .rows { margin: 12px 0 0; display: grid; div { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; } dt { color: var(--ink-2); } dd { margin: 0; font-weight: 600; } }
     .full { width: 100%; }
     .top { margin-top: 16px; }
@@ -162,6 +166,8 @@ export class QuotePage {
   readonly picked = signal<Set<string>>(new Set());
   readonly wantsIntro = signal<boolean | null>(null);
   readonly err = signal('');
+  readonly sending = signal(false);
+  readonly sent = signal(false);
   readonly copied = signal(false);
 
   readonly ranked = computed(() => rank(this.weights()));
@@ -221,13 +227,32 @@ export class QuotePage {
     try { await navigator.clipboard.writeText(this.summary()); this.copied.set(true); setTimeout(() => this.copied.set(false), 2000); } catch { /* clipboard blocked */ }
   }
 
-  sendIntro(e: Event) {
+  async sendIntro(e: Event) {
     e.preventDefault();
     const f = new FormData(e.target as HTMLFormElement);
-    const name = String(f.get('name') || '').trim(), county = String(f.get('county') || '').trim();
-    if (!name || !county || !f.get('consent')) { this.err.set('Please fill in your name and county and tick the consent box.'); return; }
+    const name = String(f.get('name') || '').trim(), county = String(f.get('county') || '').trim(), email = String(f.get('email') || '').trim();
+    if (!name || !county || !email || !f.get('consent')) { this.err.set('Please fill in your name, email and county and tick the consent box.'); return; }
+    if (f.get('botcheck')) return;
     this.err.set('');
-    const body = `Hi,\n\nI would like an introduction to an existing customer of ${this.introNames()}.\n\nName: ${name}\nCounty: ${county}\n\n${this.summary()}\n`;
-    location.href = `mailto:${SITE.contactEmail}?subject=${encodeURIComponent('Installer introduction request')}&body=${encodeURIComponent(body)}`;
+    const message = `Referral request for ${this.introNames()}.\n\nName: ${name}\nEmail: ${email}\nCounty: ${county}\nConsent given on the site to be contacted once about a referral.\n\n${this.summary()}\n`;
+    if (!SITE.formAccessKey) {
+      location.href = `mailto:${SITE.contactEmail}?subject=${encodeURIComponent('Referral request')}&body=${encodeURIComponent(message)}`;
+      return;
+    }
+    this.sending.set(true);
+    try {
+      const res = await fetch(SITE.formEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ access_key: SITE.formAccessKey, subject: `Referral request: ${this.introNames()}`, from_name: 'GreenWattz', name, email, message }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || body.success === false) throw new Error('rejected');
+      this.sent.set(true);
+    } catch {
+      this.err.set(`Something went wrong and nothing was sent. Please try again, or email ${SITE.contactEmail}.`);
+    } finally {
+      this.sending.set(false);
+    }
   }
 }
