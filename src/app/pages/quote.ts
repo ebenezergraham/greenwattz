@@ -116,7 +116,10 @@ const DEFAULT_LEVELS: Record<Criterion, number> = { trustpilot: 2, google: 1, ex
             <dl class="rows">
               <div><dt>Panels</dt><dd class="num">{{ r().panels }} ({{ r().kwp | number: '1.1-1' }} kWp)</dd></div>
               <div><dt>Battery</dt><dd class="num">{{ r().batteryKwh ? r().batteryKwh + ' kWh' : 'None' }}</dd></div>
+              @if (r().grant) { <div><dt>SEAI solar grant</dt><dd class="num">-€{{ round50(r().grant) | number }}</dd></div> }
+              @if (r().batteryGrant) { <div><dt>SEAI battery grant</dt><dd class="num">-€{{ round50(r().batteryGrant) | number }}</dd></div> }
               <div><dt>Est. net cost</dt><dd class="num">€{{ round50(r().netCost) | number }}</dd></div>
+              <div><dt>Export income a year</dt><dd class="num">€{{ round50(r().exportIncome) | number }}</dd></div>
             </dl>
             <p class="small muted top">Share this with each installer so they quote against the same setup.</p>
             <button class="btn full" type="button" (click)="copy()">{{ copied() ? 'Copied' : 'Copy plan summary' }}</button>

@@ -765,8 +765,13 @@
         <div><dt>Panels</dt><dd class="num">{{ cfg().panels }} ({{ r().kwp | number: '1.1-1' }} kWp)</dd></div>
         <div><dt>Battery</dt><dd class="num">{{ cfg().batteryKwh ? cfg().batteryKwh + ' kWh' : 'None' }}</dd></div>
         <div><dt>Installed</dt><dd class="num">{{ eur0(r().grossCost) }}</dd></div>
-        <div><dt>SEAI grants</dt><dd class="num">{{ r().grant + r().batteryGrant ? '-' + eur0(r().grant + r().batteryGrant) : 'None' }}</dd></div>
+        <div><dt>SEAI solar grant</dt><dd class="num">{{ r().grant ? '-' + eur0(r().grant) : 'None' }}</dd></div>
+        @if (cfg().batteryKwh) { <div><dt>SEAI battery grant</dt><dd class="num">{{ r().batteryGrant ? '-' + eur0(r().batteryGrant) : 'None' }}</dd></div> }
         <div class="tot"><dt>You pay</dt><dd class="num">{{ eur0(r().netCost) }}</dd></div>
+        <div><dt>Bill saving a year</dt><dd class="num">{{ eur0(r().billSaving) }}</dd></div>
+        <div><dt>Export income a year</dt><dd class="num">{{ eur0(r().exportIncome) }}</dd></div>
+        @if (r().exportTax) { <div><dt>Tax on exports</dt><dd class="num">-{{ eur0(r().exportTax) }}</dd></div> }
+        <div class="tot"><dt>Benefit a year</dt><dd class="num">{{ eur0(r().annualBenefit) }}</dd></div>
         <div><dt>Payback</dt><dd class="num">{{ payback(r().paybackYears) }}</dd></div>
       </dl>
       <p class="small muted">Calculated in your browser. Not sent to us or stored.</p>
