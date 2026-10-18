@@ -815,7 +815,8 @@ export const BOLD_MAX_GEN_RATIO = 1.5;
 
 /** What the household wants from the system: the share of its own use covered, and the export income it hopes for. */
 export type Lean = 'solar' | 'balanced' | 'battery';
-export interface Goals { cover: number; exportIncome: number; /** Which way to tip the mix when several meet the goals. Balanced picks the cheapest. */ lean?: Lean }
+export type BatteryMode = 'any' | 'none' | 'required';
+export interface Goals { cover: number; exportIncome: number; /** Which way to tip the mix when several meet the goals. Balanced picks the cheapest. */ lean?: Lean; /** Whether the mix may, may not, or must include a battery. */ battery?: BatteryMode }
 export const DEFAULT_GOALS: Goals = { cover: 0.6, exportIncome: 0, lean: 'balanced' };
 
 export function pickStrategies(grid: Result[], exportExtra = false, goals: Goals = DEFAULT_GOALS): Scenario[] {
@@ -833,7 +834,9 @@ export function pickStrategies(grid: Result[], exportExtra = false, goals: Goals
   // Size from the goals, not from the roof: the cheapest panel and battery pair that covers the share of use asked
   // for and earns the export income asked for. An export goal lifts the oversizing cap, since it asks for surplus.
   const meets = (r: Result) => r.selfSufficiency >= goals.cover - 1e-9 && r.exportIncome >= goals.exportIncome - 1e-9;
-  const candidates = goals.exportIncome > 0 ? pool : within(BEST_MAX_GEN_RATIO);
+  const allowed = (r: Result) => goals.battery === 'none' ? r.batteryKwh === 0 : goals.battery === 'required' ? r.batteryKwh > 0 : true;
+  const base = goals.exportIncome > 0 ? pool : within(BEST_MAX_GEN_RATIO);
+  const candidates = base.filter(allowed).length ? base.filter(allowed) : base;
   const hits = candidates.filter(meets);
   const progress = (r: Result) => Math.min(1, r.selfSufficiency / Math.max(goals.cover, 1e-9)) + (goals.exportIncome > 0 ? Math.min(1, r.exportIncome / goals.exportIncome) : 0);
   // Among the systems that meet the goals: balanced is the cheapest, "more solar" uses the least battery, and
@@ -935,6 +938,31 @@ export function sizeForZones(z: BatteryZones, selected: ZoneKey[]): ZoneSize {
     chargedAverage: needKwh > 0 ? Math.min(1, (z.surplusAverage * 0.9) / needKwh) : 1,
     chargedWinter: winterNeed > 0 ? Math.min(1, (z.surplusWinter * 0.9) / winterNeed) : 1,
   };
+}
+
+export interface StrategyTemplate {
+  key: string; label: string; blurb: string;
+  goals: (h: Pick<HomeInputs, 'taxpayers'>) => Goals;
+  exportExtra: boolean;
+  gridCharge: boolean;
+  /** Needs a day and night or smart tariff; a flat tariff is switched to day and night. */
+  needsTimeOfUse?: boolean;
+}
+
+/** The strategies Irish households most often choose between, from solar for the day through to near independence. */
+export const STRATEGY_TEMPLATES: StrategyTemplate[] = [
+  { key: 'lowest', label: 'Lowest cost', blurb: 'Panels only, sized small. The quickest payback and the least money at risk.', goals: () => ({ cover: 0.25, exportIncome: 0, lean: 'balanced', battery: 'none' }), exportExtra: false, gridCharge: false },
+  { key: 'daytime', label: 'Solar for the daytime', blurb: 'Panels only, no battery. Use the sun while it shines and sell the rest. Suits homes busy in the day.', goals: () => ({ cover: 0.35, exportIncome: 0, lean: 'balanced', battery: 'none' }), exportExtra: false, gridCharge: false },
+  { key: 'evening', label: 'Solar and a battery for the evening', blurb: 'The battery stores daytime solar and runs the evening and night. The most common pairing.', goals: () => ({ cover: 0.6, exportIncome: 0, lean: 'balanced', battery: 'required' }), exportExtra: false, gridCharge: false },
+  { key: 'night-rate', label: 'Battery charged at the night rate', blurb: 'Solar in the day, and the battery tops up overnight on cheap power to cover the expensive hours.', goals: () => ({ cover: 0.65, exportIncome: 0, lean: 'balanced', battery: 'required' }), exportExtra: false, gridCharge: true, needsTimeOfUse: true },
+  { key: 'export', label: 'Solar for export income', blurb: 'More panels than you use, to sell the surplus. Aims at the tax-free export allowance.', goals: (h) => ({ cover: 0.4, exportIncome: 600 * h.taxpayers, lean: 'solar', battery: 'none' }), exportExtra: true, gridCharge: false },
+  { key: 'independent', label: 'Near independence', blurb: 'Big battery and enough panels to cover most of your use, with export on top. Still connected to the grid.', goals: () => ({ cover: 0.85, exportIncome: 0, lean: 'balanced', battery: 'required' }), exportExtra: true, gridCharge: false },
+];
+
+/** What a template would recommend for this home and usage, with its own export and charging settings. */
+export function templateResult(t: StrategyTemplate, usage: Usage, home: HomeInputs, a: Assumptions): Scenario {
+  const aa: Assumptions = { ...a, exportExtra: t.exportExtra, gridCharge: t.gridCharge, tariff: t.needsTimeOfUse && a.tariff === 'flat' ? 'dayNight' : a.tariff };
+  return pickStrategies(buildGrid(usage, home, aa), aa.exportExtra, t.goals(home))[1];
 }
 
 export interface Cashflow {

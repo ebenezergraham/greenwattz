@@ -3,7 +3,7 @@ import {
   PRICES, priceAgeDays, pricesAreStale,
   Eligibility, grantEligibility,
   Assumptions, BATTERY_OPTIONS, BATTERY_PRODUCTS, BATTERY_SIZES, BATTERY_TIERS, BatteryTier, batteryPrice, batteryTierInfo, BandMonthly, bandHours, medianFromBands, profileFromBands, Band, Tariff, bandBreakdown, bandOf, bandsOfDay, blendedRate, dayStats, rateFor, BEST_MAX_GEN_RATIO, CONNECTION_LIMIT_KW, HOUSE_TYPES, ROOF_TYPES, STOREY_ACCESS, roofTypeInfo, DEFAULT_ASSUMPTIONS as A, HomeInputs, MONTH_DAYS, NO_OBSTACLES, Usage,
-  annualFromBill, annualFromProfile, averageDay, buildGrid, cashflow, batteryZones, sizeForZones, ZONES, DEFAULT_GOALS, Goals, mixWarnings, EXPORT_PRESETS, ratePreset, RATE_PRESETS, inverterLimitKw, loanPayment, paybackRange, exportTaxFor, EXPORT_TAX_RATES, LIFETIME, paybackFrom, project, connectionLimitPanels, costBreakdown, estimateProfile,
+  annualFromBill, annualFromProfile, averageDay, buildGrid, cashflow, templateResult, STRATEGY_TEMPLATES, batteryZones, sizeForZones, ZONES, DEFAULT_GOALS, Goals, mixWarnings, EXPORT_PRESETS, ratePreset, RATE_PRESETS, inverterLimitKw, loanPayment, paybackRange, exportTaxFor, EXPORT_TAX_RATES, LIFETIME, paybackFrom, project, connectionLimitPanels, costBreakdown, estimateProfile,
   maxPanels, obstacleArea, orientationFactor, pickStrategies, roofFitPanels, seaiGrantFor, shadingFactor, simulate, solarDay,
   splitUsage, systemCost, usableArea, withExtras,
 } from './engine';
@@ -1301,5 +1301,50 @@ describe('battery size for chosen times of day', () => {
     expect(r.chargedAverage).toBeGreaterThan(0);
     expect(r.chargedAverage).toBeLessThanOrEqual(1);
     expect(r.chargedWinter).toBeLessThanOrEqual(r.chargedAverage);
+  });
+});
+
+describe('strategy templates', () => {
+  const big = () => ({ ...home(), roofAreaM2: 110, threePhase: true });
+  const res = (key: string, h = big(), a: Partial<typeof A> = {}) => templateResult(STRATEGY_TEMPLATES.find((t) => t.key === key)!, usage(), h, { ...A, ...a });
+  it('has distinct keys, labels and blurbs', () => {
+    const keys = STRATEGY_TEMPLATES.map((t) => t.key);
+    expect(new Set(keys).size).toBe(keys.length);
+    for (const t of STRATEGY_TEMPLATES) { expect(t.label.length).toBeGreaterThan(3); expect(t.blurb.length).toBeGreaterThan(20); }
+  });
+  it('keeps battery-free strategies free of a battery and gives the others one', () => {
+    for (const k of ['lowest', 'daytime', 'export']) expect(res(k).batteryKwh).toBe(0);
+    for (const k of ['evening', 'night-rate', 'independent']) expect(res(k).batteryKwh).toBeGreaterThan(0);
+  });
+  it('covers more of your use the more independent the strategy', () => {
+    expect(res('evening').selfSufficiency).toBeGreaterThan(res('daytime').selfSufficiency);
+    expect(res('independent').selfSufficiency).toBeGreaterThanOrEqual(res('evening').selfSufficiency);
+  });
+  it('costs the least for the lowest cost strategy', () => {
+    for (const t of STRATEGY_TEMPLATES) expect(res('lowest').netCost).toBeLessThanOrEqual(res(t.key).netCost + 1e-6);
+  });
+  it('earns the export goal for the export strategy, doubling it for two people', () => {
+    const one = res('export'), two = res('export', { ...big(), taxpayers: 2 });
+    expect(one.exportIncome).toBeGreaterThanOrEqual(600);
+    expect(two.exportIncome).toBeGreaterThanOrEqual(1200);
+    expect(two.panels).toBeGreaterThanOrEqual(one.panels);
+  });
+  it('sizes the export strategy bigger than the daytime one', () => {
+    expect(res('export').panels).toBeGreaterThan(res('daytime').panels);
+  });
+  it('charges at the night rate in that strategy, and switches a flat tariff to day and night', () => {
+    const r = res('night-rate', big(), { tariff: 'flat' });
+    expect(r.byBand.map((b) => b.band)).toContain('night');
+    expect(r.batteryKwh).toBeGreaterThan(0);
+  });
+  it('says when a strategy cannot be met on a small roof, and still returns a system', () => {
+    const r = res('independent', { ...home(), roofAreaM2: 12 });
+    expect(r.panels).toBeGreaterThan(0);
+    expect(typeof r.meetsGoals).toBe('boolean');
+  });
+  it('applies a battery rule to any goals', () => {
+    const grid = buildGrid(usage(), big(), A);
+    expect(pickStrategies(grid, false, { cover: 0.5, exportIncome: 0, battery: 'none' })[1].batteryKwh).toBe(0);
+    expect(pickStrategies(grid, false, { cover: 0.5, exportIncome: 0, battery: 'required' })[1].batteryKwh).toBeGreaterThan(0);
   });
 });

@@ -4,7 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
 import { PlanStore } from '../core/store';
-import { Assumptions, ZoneKey, batteryZones, sizeForZones, Lean, mixWarnings, EXPORT_PRESETS, RATE_PRESETS, RatePresetKey, ratePreset, inverterLimitKw, siteOrientationFactor, shadingFactor, roofTypeInfo, BATTERY_PRODUCTS, BATTERY_SIZES, loanPayment, paybackRange, EXPORT_TAX_RATES, exportTaxFor, PRICES, grantEligibility, seaiGrantFor, BATTERY_GUIDE, BATTERY_OPTIONS, BATTERY_TIERS, BatteryTier, batteryPrice, HOUSE_TYPES, HouseType, OBSTACLES, ObstacleKey, ROOF_TYPES, RoofType, Storeys, Orientation, Occupancy, Shading, Scenario, Tariff, bandsOfDay, simulate, solarDay } from '../core/engine';
+import { Assumptions, BatteryMode, STRATEGY_TEMPLATES, StrategyTemplate, templateResult, ZoneKey, batteryZones, sizeForZones, Lean, mixWarnings, EXPORT_PRESETS, RATE_PRESETS, RatePresetKey, ratePreset, inverterLimitKw, siteOrientationFactor, shadingFactor, roofTypeInfo, BATTERY_PRODUCTS, BATTERY_SIZES, loanPayment, paybackRange, EXPORT_TAX_RATES, exportTaxFor, PRICES, grantEligibility, seaiGrantFor, BATTERY_GUIDE, BATTERY_OPTIONS, BATTERY_TIERS, BatteryTier, batteryPrice, HOUSE_TYPES, HouseType, OBSTACLES, ObstacleKey, ROOF_TYPES, RoofType, Storeys, Orientation, Occupancy, Shading, Scenario, Tariff, bandsOfDay, simulate, solarDay } from '../core/engine';
 import { HdfError, parseHdf } from '../core/hdf';
 import { inferHousehold } from '../core/infer';
 import { CashChart, DayChart, Legend, MonthChart } from '../ui/charts';
@@ -48,6 +48,26 @@ export class PlanPage {
       sunny: this.s.dayStats().sunnyHoursPct,
     };
   });
+  /** Each common strategy applied to this home and usage, so they can be compared side by side. */
+  readonly templateRows = computed(() => {
+    const u = this.s.usage(), h = this.s.home(), a = this.s.assumptions();
+    return STRATEGY_TEMPLATES.map((t) => ({ t, r: templateResult(t, u, h, a) }));
+  });
+  /** The template whose goals and settings match what is set now, if any. */
+  readonly activeTemplate = computed(() => {
+    const g = this.s.goals(), a = this.s.assumptions(), h = this.s.home();
+    return STRATEGY_TEMPLATES.find((t) => {
+      const tg = t.goals(h);
+      return Math.abs(tg.cover - g.cover) < 1e-9 && tg.exportIncome === g.exportIncome && (tg.lean ?? 'balanced') === (g.lean ?? 'balanced') && (tg.battery ?? 'any') === (g.battery ?? 'any') && t.exportExtra === a.exportExtra && t.gridCharge === a.gridCharge;
+    })?.key ?? null;
+  });
+  applyTemplate(t: StrategyTemplate) {
+    this.s.chosen.set(null);
+    this.s.goals.set(t.goals(this.s.home()));
+    this.s.patchAssumptions({ exportExtra: t.exportExtra, gridCharge: t.gridCharge, ...(t.needsTimeOfUse && this.s.assumptions().tariff === 'flat' ? { tariff: 'dayNight' as const } : {}) });
+  }
+  readonly batteryModes: { key: BatteryMode; label: string }[] = [{ key: 'any', label: 'Either' }, { key: 'none', label: 'No battery' }, { key: 'required', label: 'With a battery' }];
+  setBatteryMode(m: BatteryMode) { this.s.chosen.set(null); this.s.goals.update((g) => ({ ...g, battery: m })); }
   /** Times of day the user wants the battery to cover. */
   readonly zoneSel = signal<ZoneKey[]>(['night', 'peak']);
   readonly zoneInfo = computed(() => batteryZones(this.s.usage(), this.s.home(), this.s.assumptions(), this.r().panels));

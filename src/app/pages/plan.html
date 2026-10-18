@@ -328,6 +328,25 @@
         <p class="sub">We tested every panel and battery combination that fits your roof. Pick a starting point, then adjust.</p>
         <estimate-note />
 
+        <section class="tpl" aria-labelledby="tpl-h">
+          <h2 id="tpl-h">Start from a common strategy</h2>
+          <p class="hint">The ways Irish households usually go, from the cheapest to near independence. Each is worked out for your own usage, home and rates. Pick one, then fine-tune below.</p>
+          <div class="cmp tpls" role="radiogroup" aria-label="Common strategies">
+            <div class="cmp-head" aria-hidden="true"><span>Strategy</span><span>System</span><span class="r">You pay</span><span class="r">Payback</span><span class="r">Covers</span><span class="r">Exports</span></div>
+            @for (x of templateRows(); track x.t.key) {
+              <button type="button" role="radio" class="cmp-row tpl-row" [class.cur]="activeTemplate() === x.t.key" [attr.aria-checked]="activeTemplate() === x.t.key" (click)="applyTemplate(x.t)">
+                <span class="nm"><span class="radio" aria-hidden="true"></span><span class="t"><b>{{ x.t.label }}</b><span class="small muted">{{ x.t.blurb }}</span>@if (x.t.needsTimeOfUse && s.assumptions().tariff === 'flat') { <span class="small muted">Switches you to a day and night tariff.</span> }@if (x.r.meetsGoals === false) { <span class="small warnt">Your roof or connection cannot fully reach this.</span> }</span></span>
+                <span class="sy num">{{ x.r.panels }} panels<span class="small muted">{{ x.r.batteryKwh ? x.r.batteryKwh + ' kWh battery' : 'no battery' }}</span></span>
+                <span class="r num" data-l="You pay"><b>{{ eur0(x.r.netCost) }}</b></span>
+                <span class="r num" data-l="Payback">{{ payback(x.r.paybackYears) }}</span>
+                <span class="r num" data-l="Covers">{{ pc(x.r.selfSufficiency) }}</span>
+                <span class="r num" data-l="Exports">{{ eur0(x.r.exportIncome) }} a year</span>
+              </button>
+            }
+          </div>
+          @if (grantsPending()) { <p class="hint">Costs are before SEAI grants until you enter the year your home was first occupied on the Home step.</p> }
+        </section>
+
         <section class="goals" aria-labelledby="goals-h">
           <h2 id="goals-h">What should it do for you?</h2>
           <p class="hint">We pick the panels and battery together to meet these, not to fill your roof.</p>
@@ -347,6 +366,15 @@
                 </div>
                 <p class="hint">Money from selling surplus power. Export is tax-free up to {{ eur0(s.assumptions().exportTaxFreePerPerson * s.home().taxpayers) }} a year for {{ s.home().taxpayers === 1 ? 'one person' : 'two people' }}. A goal here asks for more panels than your own use needs.</p>
               </div>
+            </div>
+          </div>
+          <div class="q">
+            <span class="ql" id="bm">Battery</span>
+            <div class="qc">
+              <div class="seg" role="group" aria-labelledby="bm">
+                @for (m of batteryModes; track m.key) { <button type="button" [attr.aria-pressed]="(s.goals().battery ?? 'any') === m.key" (click)="setBatteryMode(m.key)">{{ m.label }}</button> }
+              </div>
+              <p class="hint">Whether the recommended mix may include a battery, must have one, or must not.</p>
             </div>
           </div>
           <div class="q">
