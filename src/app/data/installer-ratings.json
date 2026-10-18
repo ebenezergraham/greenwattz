@@ -117,7 +117,8 @@
         "url": "https://ie.trustpilot.com/review/ecoplexenergy.ie",
         "asOf": "2026-10-17"
       },
-      "google": null
+      "google": null,
+      "seaiName": "Ecoplex Energy Solution LTD"
     },
     {
       "slug": "swyft",
@@ -195,7 +196,8 @@
         "url": "https://ie.trustpilot.com/review/jmenergy.ie",
         "asOf": "2026-10-17"
       },
-      "google": null
+      "google": null,
+      "seaiName": "JM Energy Saving LTD"
     },
     {
       "slug": "lvp",

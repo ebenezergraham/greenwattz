@@ -18,8 +18,8 @@ const PAGE = 40;
 
         <div class="controls card">
           <div class="field"><label for="q">Search by company name</label><input id="q" type="text" [value]="q()" (input)="q.set($any($event.target).value); shown.set(40)" /></div>
-          <div class="field"><label for="c">County</label>
-            <select id="c" [value]="county()" (change)="county.set($any($event.target).value); shown.set(40)">
+          <div class="field"><label for="c">County covered</label>
+            <select id="c" aria-label="County covered" [value]="county()" (change)="county.set($any($event.target).value); shown.set(40)">
               <option value="">All counties</option>
               @for (c of counties; track c) { <option [value]="c">{{ c }}</option> }
             </select>
@@ -33,9 +33,8 @@ const PAGE = 40;
             <li class="card row">
               <div class="info">
                 <h2>{{ c.name }}</h2>
-                <p class="small muted">{{ place(c) }}</p>
+                <p class="small muted">{{ place(c) }}@if (c.registration) { <span class="num"> · SEAI no. {{ c.registration }}</span> }</p>
                 <p class="small">
-                  @if (c.phone) { <span class="num">{{ c.phone }}</span> }
                   @if (c.website) { <a [href]="c.website" target="_blank" rel="noopener noreferrer">Website</a> }
                 </p>
               </div>
@@ -70,7 +69,7 @@ export class SeaiPage {
   readonly all = SEAI.companies;
   readonly source = SEAI.source;
   readonly asOf = SEAI.asOf ? dateFmt(SEAI.asOf) : '';
-  readonly counties = [...new Set(this.all.map((c) => c.county).filter((x): x is string => !!x))].sort();
+  readonly counties = [...new Set(this.all.flatMap((c) => c.counties ?? []))].sort();
   readonly q = signal('');
   readonly county = signal('');
   readonly ratedOnly = signal(false);
@@ -78,9 +77,13 @@ export class SeaiPage {
 
   readonly list = computed(() => {
     const q = this.q().trim().toLowerCase(), c = this.county(), r = this.ratedOnly();
-    return this.all.filter((x) => (!q || x.name.toLowerCase().includes(q)) && (!c || x.county === c) && (!r || !!installerFor(x)));
+    return this.all.filter((x) => (!q || x.name.toLowerCase().includes(q)) && (!c || (x.counties ?? []).includes(c)) && (!r || !!installerFor(x)));
   });
   readonly visible = computed(() => this.list().slice(0, this.shown()));
   rated = (c: SeaiCompany) => installerFor(c);
-  place(c: SeaiCompany) { return [c.address, c.county].filter(Boolean).join(', ') || 'Address not listed'; }
+  place(c: SeaiCompany) {
+    const n = c.counties?.length ?? 0;
+    if (!n) return 'Coverage not listed';
+    return n >= 24 ? 'Covers all of Ireland' : 'Covers ' + c.counties!.join(', ');
+  }
 }

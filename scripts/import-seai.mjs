@@ -1,5 +1,7 @@
 // Converts the SEAI "Solar PV companies" CSV export into src/app/data/seai-registered.json.
 //
+// Note: contact details (email, phone) are deliberately dropped. Only business name, registration number,
+// website, scope and counties are kept, in the JSON and in the committed backup.
 // SEAI's site blocks automated requests, so download the file yourself in a browser:
 //   1. Open https://www.seai.ie/grants/find-a-registered-professional/solar-pv-companies
 //   2. Use the download / export option on the results (all counties, domestic).
@@ -34,8 +36,7 @@ const col = (...keys) => head.findIndex((h) => keys.some((k) => h.includes(k)));
 const idx = {
   name: col('company', 'name', 'contractor'),
   county: col('county'),
-  address: col('address'),
-  phone: col('phone', 'tel'),
+  reg: col('registration'),
   website: col('website', 'web', 'url'),
   scope: col('domestic', 'type', 'category', 'scheme'),
 };
@@ -50,12 +51,12 @@ for (const r of rows) {
   const key = name.toLowerCase();
   if (seen.has(key)) continue;
   seen.add(key);
-  const website = get(r, idx.website);
+  let website = get(r, idx.website);
+  if (website.includes('@')) website = ''; // some entries hold an email address in the website field
   companies.push({
     name,
-    county: get(r, idx.county) || undefined,
-    address: get(r, idx.address) || undefined,
-    phone: get(r, idx.phone) || undefined,
+    registration: get(r, idx.reg) || undefined,
+    counties: get(r, idx.county).split(',').map((c) => c.trim()).filter(Boolean),
     website: website ? (/^https?:/i.test(website) ? website : 'https://' + website) : undefined,
     scope: get(r, idx.scope) || undefined,
   });
@@ -80,5 +81,10 @@ const same = prev === companies.length && companies.every((c) => prevNames.has(c
 // Keep the old "asOf" date when nothing changed so the file (and git) stays quiet.
 if (same) out.asOf = JSON.parse(prevFile).asOf ?? out.asOf;
 await writeFile(OUT, JSON.stringify(out, null, 2) + '\n');
+
+// Sanitised backup that is safe to commit to a public repo: no emails or phone numbers.
+const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+const backup = ['Company,Registration number,Website,Scope,Counties', ...companies.map((c) => [c.name, c.registration, c.website, c.scope, (c.counties ?? []).join(', ')].map(q).join(','))].join('\n') + '\n';
+await writeFile(new URL('../data/seai/register-backup.csv', import.meta.url), backup);
 console.log(same ? 'No change in the register.' : `Register changed: ${prev} -> ${companies.length} companies.`);
 console.log(`Imported ${companies.length} companies. Columns used:`, Object.fromEntries(Object.entries(idx).map(([k, v]) => [k, head[v] ?? null])));

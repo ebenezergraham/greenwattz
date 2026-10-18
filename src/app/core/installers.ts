@@ -9,6 +9,8 @@ export interface Verified { price?: number; quality?: number; warranty?: number;
 export interface Installer {
   slug: string; name: string; kind: string; domain: string;
   trustpilot: Source | null; google: Source | null; verified?: Verified;
+  /** Exact company name on the SEAI register when it differs from the trading name. */
+  seaiName?: string;
 }
 
 export const ALL: Installer[] = (ratings as { installers: Installer[] }).installers;
@@ -58,11 +60,11 @@ export function rank(weights: Record<Priority, number>, minReviews = 100): Ranke
     .sort((a, b) => b.score - a.score || b.installer.trustpilot!.count - a.installer.trustpilot!.count);
 }
 
-export interface SeaiCompany { name: string; county?: string; address?: string; phone?: string; website?: string; scope?: string }
+export interface SeaiCompany { name: string; registration?: string; counties?: string[]; website?: string; scope?: string }
 export const SEAI = seai as { asOf: string | null; source: string; companies: SeaiCompany[] };
 
 const norm = (s: string) =>
-  s.toLowerCase().replace(/&/g, 'and').replace(/\b(ltd|limited|plc|dac|solar|energies|energy|ireland|the|and)\b/g, '').replace(/[^a-z0-9]/g, '');
+  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/&/g, 'and').replace(/\b(ltd|limited|plc|dac|solar|energies|energy|ireland|the|and)\b/g, '').replace(/[^a-z0-9]/g, '');
 function domainOf(u?: string): string {
   if (!u) return '';
   try { return new URL(/^https?:/i.test(u) ? u : 'https://' + u).hostname.replace(/^www\./, ''); } catch { return ''; }
@@ -73,9 +75,9 @@ export function seaiMatch(i: Installer): SeaiCompany | undefined {
   const dom = i.domain.replace(/^www\./, '');
   const byDomain = SEAI.companies.find((c) => domainOf(c.website) === dom);
   if (byDomain) return byDomain;
-  const n = norm(i.name);
-  if (n.length < 5) return undefined;
-  return SEAI.companies.find((c) => { const m = norm(c.name); return m.length >= 5 && m === n; });
+  const n = norm(i.seaiName ?? i.name);
+  if (n.length < 2) return undefined;
+  return SEAI.companies.find((c) => { const m = norm(c.name); return m.length >= 2 && m === n; });
 }
 
 /** Reverse lookup: the rated installer (if any) for an SEAI company. */

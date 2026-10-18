@@ -4,8 +4,6 @@ on:
   schedule:
     - cron: '0 6 * * 1' # Mondays 06:00 UTC
   workflow_dispatch:
-  push:
-    paths: ['data/seai/latest.csv']
 
 permissions:
   contents: write
@@ -22,18 +20,13 @@ jobs:
 
       - name: Fetch and import (scheduled runs)
         id: fetch
-        if: github.event_name != 'push'
         run: |
           set +e
           node scripts/refresh-seai.mjs
           echo "code=$?" >> "$GITHUB_OUTPUT"
 
-      - name: Import committed CSV (push runs)
-        if: github.event_name == 'push'
-        run: node scripts/import-seai.mjs data/seai/latest.csv
-
       - name: Record successful check
-        if: github.event_name == 'push' || steps.fetch.outputs.code == '0'
+        if: steps.fetch.outputs.code == '0'
         run: date -u +%F > data/seai/last-success.txt
 
       - name: Commit changes
@@ -64,5 +57,5 @@ jobs:
           if [ -z "$(gh issue list --label seai-refresh --state open --json number -q '.[0].number')" ]; then
             gh label create seai-refresh --color 0b7a62 2>/dev/null || true
             gh issue create --label seai-refresh --title "SEAI register data is stale" \
-              --body "SEAI blocks automated downloads, and the last successful refresh was ${last:-never}. The site keeps serving the last good data. Options: ask SEAI for an allow-listed feed, or save https://www.seai.ie/export-solar?county=All&domestic_nondomestic=domestic&page&_format=csv as data/seai/latest.csv and push (the import runs automatically)."
+              --body "SEAI blocks automated downloads, and the last successful refresh was ${last:-never}. The site keeps serving the last good data. Options: ask SEAI for an allow-listed feed, or download https://www.seai.ie/export-solar?county=All&domestic_nondomestic=domestic&page&_format=csv and run npm run import:seai -- <file>, then push."
           fi
