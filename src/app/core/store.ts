@@ -44,7 +44,7 @@ export class PlanStore {
   readonly dayStats = computed(() => dayStats(this.dayShape()));
   readonly maxPanels = computed(() => maxPanels(this.home(), this.assumptions()));
   readonly grid = computed(() => buildGrid(this.usage(), this.home(), this.assumptions()));
-  readonly strategies = computed(() => pickStrategies(this.grid()));
+  readonly strategies = computed(() => pickStrategies(this.grid(), this.assumptions().exportExtra));
   readonly best = computed(() => this.strategies()[1]);
   readonly config = computed<Config>(() => {
     const c = this.chosen();

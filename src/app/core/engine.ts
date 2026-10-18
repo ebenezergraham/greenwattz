@@ -140,6 +140,10 @@ export interface Assumptions {
   batteryTier: BatteryTier;
   batteryEfficiency: number;
   seaiGrant: boolean;
+  /** The household plans to sell surplus power, so the panel count may go past the connection limit up to what the roof fits. */
+  exportExtra: boolean;
+  /** Charge the battery from the grid in the cheapest band (night) as well as from solar. Only used with a day/night or smart tariff. */
+  gridCharge: boolean;
   /** Count the SEAI battery grant (600 euro for 5 kWh or more) when the home is eligible. */
   seaiBatteryGrant: boolean;
   /** Export income that is tax-free for each person on the bill (euro a year). 600 is announced; 400 is the limit in force. */
@@ -166,6 +170,8 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
   batteryTier: 'mainstream',
   batteryEfficiency: 0.9,
   seaiGrant: true,
+  exportExtra: false,
+  gridCharge: false,
   seaiBatteryGrant: PRICES.grants.seaiBatteryConfirmed,
   exportTaxFreePerPerson: PRICES.tax.exportExemptionPerPerson,
   exportTaxRate: PRICES.tax.exportTaxRate,
@@ -584,8 +590,18 @@ export function roofFitPanels(home: HomeInputs, a: Assumptions): number {
   return Math.floor(usableArea(home) / a.panelAreaM2);
 }
 
+/** Most panels the planner will use. Normally the connection limit; with a plan to export, whatever the roof fits (up to 30). */
 export function maxPanels(home: HomeInputs, a: Assumptions): number {
-  return Math.max(2, Math.min(30, roofFitPanels(home, a), connectionLimitPanels(home, a)));
+  const fit = roofFitPanels(home, a);
+  return Math.max(2, Math.min(30, a.exportExtra ? fit : Math.min(fit, connectionLimitPanels(home, a))));
+}
+
+/** Real sunny-hour output runs about 40% above the smooth typical-day average, so the inverter limit starts to bite earlier than the average suggests. */
+const SUNNY_PEAK = 1.4;
+
+/** The inverter's output limit in kW. Panels beyond this size still generate, but output above the limit is lost. */
+export function inverterLimitKw(home: HomeInputs): number {
+  return home.threePhase ? CONNECTION_LIMIT_KW.three : CONNECTION_LIMIT_KW.single;
 }
 
 /** Simulate a typical day per month at hourly steps. */
@@ -597,6 +613,10 @@ export function simulate(usage: Usage, home: HomeInputs, a: Assumptions, cfg: Co
   const usable = cap * 0.9; // keep 10% reserve
   const maxRate = Math.max(0.1, cap / 2); // kW charge/discharge, ~0.5C
   const eff = Math.sqrt(a.batteryEfficiency);
+  const limitKw = inverterLimitKw(home);
+  // Charging from the grid only pays when the cheapest band, after round-trip losses, still undercuts the band it displaces.
+  const cheapRate = a.nightRate;
+  const gridCharges = cap > 0 && a.gridCharge && a.tariff !== 'flat' && cheapRate / a.batteryEfficiency < a.dayRate;
 
   let gen = 0, self = 0, exp = 0, imp = 0, baseImp = 0;
   let billBefore = 0, billAfter = 0, exportIncome = 0;
@@ -614,25 +634,55 @@ export function simulate(usage: Usage, home: HomeInputs, a: Assumptions, cfg: Co
       return t > start && t < start + len ? Math.sin((Math.PI * (t - start)) / len) ** 1.3 : 0;
     });
     const ws = w.reduce((x, y) => x + y, 0) || 1;
-    let soc = 0;
+    // Pre-pass for the day: what solar leaves uncovered outside the cheap hours, and what surplus it has to charge with.
+    const gHour = w.map((x) => Math.min(limitKw / SUNNY_PEAK, (x / ws) * gDay));
+    let needDay = 0, surplusDay = 0;
+    if (gridCharges) {
+      for (let h = 0; h < 24; h++) {
+        if (bandOf(h, a.tariff) === 'night') continue;
+        const l = usage.profile[m][h];
+        needDay += Math.max(0, l - gHour[h]);
+        surplusDay += Math.max(0, gHour[h] - l);
+      }
+    }
+    // Stored energy to bring in overnight: what the day needs beyond what solar surplus would cover.
+    const gridTarget = gridCharges ? Math.min(usable, Math.max(0, needDay - Math.min(usable, surplusDay) * eff) / eff) : 0;
+    let socSolar = 0, socGrid = 0;
     let dGen = 0, dSelf = 0, dExp = 0, dImp = 0, dBase = 0, dBefore = 0, dAfter = 0, dIncome = 0, dDemand = 0;
     for (let h = 0; h < 24; h++) {
-      const g = (w[h] / ws) * gDay;
+      const g = gHour[h];
       const load = usage.profile[m][h];
       const rate = rateFor(h, a);
+      const cheap = bandOf(h, a.tariff) === 'night';
       dGen += g; dDemand += load;
       dBase += load; dBefore += load * rate;
-      let direct = Math.min(g, load);
+      const direct = Math.min(g, load);
       let surplus = g - direct;
       let deficit = load - direct;
-      let fromBat = 0;
+      let fromBat = 0, fromBatSolar = 0;
       if (cap > 0) {
+        const soc = socSolar + socGrid;
         const charge = Math.min(surplus, maxRate, (usable - soc) / eff);
-        if (charge > 0) { soc += charge * eff; surplus -= charge; }
-        const dis = Math.min(deficit, maxRate, soc * eff);
-        if (dis > 0) { soc -= dis / eff; deficit -= dis; fromBat = dis; }
+        if (charge > 0) { socSolar += charge * eff; surplus -= charge; }
+        if (gridCharges && cheap && h < 8) {
+          const room = Math.min(gridTarget - (socSolar + socGrid), maxRate * eff);
+          if (room > 0) {
+            const drawn = room / eff;
+            socGrid += room;
+            dImp += drawn; dAfter += drawn * rate;
+          }
+        }
+        if (!(gridCharges && cheap)) {
+          const total = socSolar + socGrid;
+          const dis = Math.min(deficit, maxRate, total * eff);
+          if (dis > 0) {
+            const solarShare = total > 0 ? socSolar / total : 0;
+            socSolar -= (dis / eff) * solarShare; socGrid -= (dis / eff) * (1 - solarShare);
+            deficit -= dis; fromBat = dis; fromBatSolar = dis * solarShare;
+          }
+        }
       }
-      dSelf += direct + fromBat;
+      dSelf += direct + fromBatSolar;
       dExp += surplus;
       dImp += deficit;
       dAfter += deficit * rate;
@@ -709,12 +759,13 @@ export function buildGrid(usage: Usage, home: HomeInputs, a: Assumptions): Resul
 export const BEST_MAX_GEN_RATIO = 1.25;
 export const BOLD_MAX_GEN_RATIO = 1.5;
 
-export function pickStrategies(grid: Result[]): Scenario[] {
+export function pickStrategies(grid: Result[], exportExtra = false): Scenario[] {
   const value = (r: Result) => r.netGain;
   const viable = grid.filter((r) => isFinite(r.paybackYears));
   const pool = viable.length ? viable : grid;
   // Selling surplus power is worth less and less certain than using it, so cap how much we oversize.
   const within = (ratio: number) => {
+    if (exportExtra) ratio = Infinity; // the household plans to sell surplus, so size on return alone
     const ok = pool.filter((r) => r.generationKwh <= ratio * r.baselineImportKwh);
     return ok.length ? ok : [[...pool].sort((x, y) => x.generationKwh - y.generationKwh)[0]];
   };

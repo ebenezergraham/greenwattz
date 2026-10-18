@@ -152,3 +152,4 @@ input.short { max-width: 200px; }
 @media (max-width: 760px) { .cmp.rng .cmp-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 .prod { list-style: none; margin: 12px 0; padding: 0; display: grid; li { display: grid; gap: 2px; padding: 10px 0; border-top: 1px solid var(--line); } b { font-weight: 650; } }
+.ql.sub { display: block; margin-top: 14px; padding-top: 0; }

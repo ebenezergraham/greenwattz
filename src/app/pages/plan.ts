@@ -4,7 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
 import { PlanStore } from '../core/store';
-import { Assumptions, BATTERY_PRODUCTS, BATTERY_SIZES, loanPayment, paybackRange, EXPORT_TAX_RATES, exportTaxFor, PRICES, grantEligibility, seaiGrantFor, BATTERY_GUIDE, BATTERY_OPTIONS, BATTERY_TIERS, BatteryTier, batteryPrice, HOUSE_TYPES, HouseType, OBSTACLES, ObstacleKey, ROOF_TYPES, RoofType, Storeys, Orientation, Occupancy, Shading, Scenario, Tariff, bandsOfDay, simulate, solarDay } from '../core/engine';
+import { Assumptions, inverterLimitKw, BATTERY_PRODUCTS, BATTERY_SIZES, loanPayment, paybackRange, EXPORT_TAX_RATES, exportTaxFor, PRICES, grantEligibility, seaiGrantFor, BATTERY_GUIDE, BATTERY_OPTIONS, BATTERY_TIERS, BatteryTier, batteryPrice, HOUSE_TYPES, HouseType, OBSTACLES, ObstacleKey, ROOF_TYPES, RoofType, Storeys, Orientation, Occupancy, Shading, Scenario, Tariff, bandsOfDay, simulate, solarDay } from '../core/engine';
 import { HdfError, parseHdf } from '../core/hdf';
 import { inferHousehold } from '../core/infer';
 import { CashChart, DayChart, Legend, MonthChart } from '../ui/charts';
@@ -31,6 +31,18 @@ export class PlanPage {
   readonly products = BATTERY_PRODUCTS;
   readonly lastBattery = signal(10);
   readonly hasBattery = computed(() => this.cfg().batteryKwh > 0);
+  inverterKw() { return inverterLimitKw(this.s.home()); }
+  setExportExtra(on: boolean) { this.s.chosen.set(null); this.s.patchAssumptions({ exportExtra: on }); }
+  setGridCharge(on: boolean) { this.s.patchAssumptions({ gridCharge: on }); }
+  gridChargeHint(): string {
+    const a = this.s.assumptions();
+    const night = Math.round(a.nightRate * 1000) / 10, day = Math.round(a.dayRate * 1000) / 10;
+    const worth = a.nightRate / a.batteryEfficiency < a.dayRate;
+    if (!worth) return `At ${night}c night and ${day}c day, charging from the grid does not beat the day rate after losses, so it is switched off in the numbers.`;
+    return a.gridCharge
+      ? `The battery tops up overnight (11pm to 8am, ${night}c) only as far as the next day needs after your solar, then supplies the ${day}c hours. Needs a smart meter and a day and night or smart tariff.`
+      : `Turn this on to top the battery up overnight at ${night}c instead of buying at ${day}c later. It helps most in winter, and with an EV or heat pump.`;
+  }
   setHasBattery(on: boolean) { this.setBattery(on ? this.lastBattery() : 0); }
   constructor() {
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((q) => {

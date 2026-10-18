@@ -3,7 +3,7 @@ import {
   PRICES, priceAgeDays, pricesAreStale,
   Eligibility, grantEligibility,
   Assumptions, BATTERY_OPTIONS, BATTERY_PRODUCTS, BATTERY_SIZES, BATTERY_TIERS, BatteryTier, batteryPrice, batteryTierInfo, BandMonthly, bandHours, medianFromBands, profileFromBands, Band, Tariff, bandBreakdown, bandOf, bandsOfDay, blendedRate, dayStats, rateFor, BEST_MAX_GEN_RATIO, CONNECTION_LIMIT_KW, HOUSE_TYPES, ROOF_TYPES, STOREY_ACCESS, roofTypeInfo, DEFAULT_ASSUMPTIONS as A, HomeInputs, MONTH_DAYS, NO_OBSTACLES, Usage,
-  annualFromBill, annualFromProfile, averageDay, buildGrid, cashflow, loanPayment, paybackRange, exportTaxFor, EXPORT_TAX_RATES, LIFETIME, paybackFrom, project, connectionLimitPanels, costBreakdown, estimateProfile,
+  annualFromBill, annualFromProfile, averageDay, buildGrid, cashflow, inverterLimitKw, loanPayment, paybackRange, exportTaxFor, EXPORT_TAX_RATES, LIFETIME, paybackFrom, project, connectionLimitPanels, costBreakdown, estimateProfile,
   maxPanels, obstacleArea, orientationFactor, pickStrategies, roofFitPanels, seaiGrantFor, shadingFactor, simulate, solarDay,
   splitUsage, systemCost, usableArea, withExtras,
 } from './engine';
@@ -989,4 +989,58 @@ describe('loan repayment', () => {
     expect(loanPayment(10000, 6, 10).monthly).toBeLessThan(loanPayment(10000, 6, 5).monthly);
   });
   it('is zero for nothing borrowed', () => expect(loanPayment(0, 6, 5).monthly).toBe(0));
+});
+
+describe('selling extra power', () => {
+  const big = () => ({ ...home(), roofAreaM2: 120 });
+  it('keeps panels to the connection limit by default and lifts it with a plan to export', () => {
+    expect(maxPanels(big(), A)).toBe(connectionLimitPanels(big(), A));
+    expect(maxPanels(big(), { ...A, exportExtra: true })).toBeGreaterThan(connectionLimitPanels(big(), A));
+    expect(maxPanels(big(), { ...A, exportExtra: true })).toBeLessThanOrEqual(30);
+  });
+  it('never goes past what the roof fits', () => {
+    const small = { ...home(), roofAreaM2: 22 };
+    expect(maxPanels(small, { ...A, exportExtra: true })).toBeLessThanOrEqual(roofFitPanels(small, A));
+  });
+  it('loses output above the inverter limit', () => {
+    const lo = simulate(usage(), big(), A, { panels: 13, batteryKwh: 0 });
+    const hi = simulate(usage(), big(), A, { panels: 26, batteryKwh: 0 });
+    expect(hi.generationKwh).toBeGreaterThan(lo.generationKwh);
+    expect(hi.generationKwh).toBeLessThan(lo.generationKwh * 2);
+    expect(inverterLimitKw(big())).toBe(6);
+  });
+  it('lets the recommendation use more panels when exporting, if it pays', () => {
+    const a = { ...A, exportExtra: true };
+    const base = pickStrategies(buildGrid(usage(), big(), A))[1];
+    const more = pickStrategies(buildGrid(usage(), big(), a), true)[1];
+    expect(more.panels).toBeGreaterThanOrEqual(base.panels);
+  });
+});
+
+describe('charging the battery from the grid at the night rate', () => {
+  const run = (a: Partial<typeof A>, kwh = 10, panels = 8) => simulate(usage(), home(), { ...A, ...a }, { panels, batteryKwh: kwh });
+  it('adds benefit on a day and night tariff', () => {
+    const off = run({ gridCharge: false }), on = run({ gridCharge: true });
+    expect(on.annualBenefit).toBeGreaterThan(off.annualBenefit);
+    expect(on.importKwh).toBeGreaterThan(off.importKwh);
+  });
+  it('does not claim grid energy as solar self-use', () => {
+    const on = run({ gridCharge: true });
+    expect(on.selfUseKwh).toBeLessThanOrEqual(on.generationKwh + 1e-6);
+    expect(on.selfSufficiency).toBeLessThanOrEqual(1);
+  });
+  it('does nothing without a battery, on a flat tariff, or when night power is not cheap enough', () => {
+    expect(run({ gridCharge: true }, 0).annualBenefit).toBeCloseTo(run({ gridCharge: false }, 0).annualBenefit, 9);
+    expect(run({ gridCharge: true, tariff: 'flat' }).annualBenefit).toBeCloseTo(run({ gridCharge: false, tariff: 'flat' }).annualBenefit, 9);
+    expect(run({ gridCharge: true, nightRate: 0.33 }).annualBenefit).toBeCloseTo(run({ gridCharge: false, nightRate: 0.33 }).annualBenefit, 9);
+  });
+  it('helps more when night power is cheaper', () => {
+    const gain = (night: number) => run({ gridCharge: true, nightRate: night }).annualBenefit - run({ gridCharge: false, nightRate: night }).annualBenefit;
+    expect(gain(0.12)).toBeGreaterThan(gain(0.2));
+  });
+  it('keeps energy balanced: imports cover the load the panels and battery do not', () => {
+    const on = run({ gridCharge: true });
+    expect(on.importKwh).toBeGreaterThan(0);
+    expect(on.billAfter).toBeGreaterThan(0);
+  });
 });

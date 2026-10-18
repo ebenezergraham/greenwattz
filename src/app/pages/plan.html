@@ -318,13 +318,27 @@
             </button>
           }
         </div>
-        @if (s.roofFit() > s.maxPanels()) {
-          <p class="hint">Your roof could fit about {{ s.roofFit() }} panels, but a standard {{ s.home().threePhase ? 'three-phase' : 'single-phase' }} connection limits a system to about {{ s.home().threePhase ? 11 : 6 }} kW ({{ s.connectionCap() }} panels). We never suggest more than that.</p>
+        @if (!s.assumptions().exportExtra && s.roofFit() > s.maxPanels()) {
+          <p class="hint">Your roof could fit about {{ s.roofFit() }} panels, but a standard {{ s.home().threePhase ? 'three-phase' : 'single-phase' }} connection limits a home inverter to about {{ s.home().threePhase ? 11 : 6 }} kW ({{ s.connectionCap() }} panels). Plan to sell extra power to see more.</p>
         }
 
         <section class="grp">
           <h2>Adjust</h2>
           <div class="qs">
+            <div class="q">
+              <span class="ql" id="expx">Selling extra power</span>
+              <div class="qc">
+                <div class="seg" role="group" aria-labelledby="expx">
+                  <button type="button" [attr.aria-pressed]="!s.assumptions().exportExtra" (click)="setExportExtra(false)">Cover my own use</button>
+                  <button type="button" [attr.aria-pressed]="s.assumptions().exportExtra" (click)="setExportExtra(true)">Add extra panels to export</button>
+                </div>
+                @if (s.assumptions().exportExtra) {
+                  <p class="hint">Panels can now go up to what your roof fits ({{ s.maxPanels() }}). Extra power is sold at {{ cents('exportRate') }}c per kWh, tax-free up to {{ eur0(r().exportTaxFree) }} a year.@if (r().kwp > inverterKw()) { Your {{ r().kwp | number: '1.1-1' }} kWp is above the {{ inverterKw() }} kW a {{ s.home().threePhase ? 'three-phase' : 'single-phase' }} connection allows, so power above that is lost and extra panels add little. Ask an installer about a bigger connection.}</p>
+                } @else {
+                  <p class="hint">Panels are limited to the {{ s.connectionCap() }} that a standard connection allows, sized mainly for your own use.</p>
+                }
+              </div>
+            </div>
             <div class="q">
               <label class="ql" for="panels">Solar panels</label>
               <div class="qc">
@@ -344,6 +358,14 @@
                     @for (b of batterySizes; track b) { <button type="button" [attr.aria-pressed]="cfg().batteryKwh === b" (click)="setBattery(b)">{{ b }} kWh</button> }
                   </div>
                   <p class="hint">Sizes the main brands sell. Bigger systems stack several modules.</p>
+                  @if (s.assumptions().tariff !== 'flat') {
+                    <span class="ql sub" id="gc">Charging</span>
+                    <div class="seg" role="group" aria-labelledby="gc">
+                      <button type="button" [attr.aria-pressed]="!s.assumptions().gridCharge" (click)="setGridCharge(false)">From my solar only</button>
+                      <button type="button" [attr.aria-pressed]="s.assumptions().gridCharge" (click)="setGridCharge(true)">Also from the grid at night</button>
+                    </div>
+                    <p class="hint">{{ gridChargeHint() }}</p>
+                  }
                   <details class="more">
                     <summary>Which brands sell which sizes</summary>
                     <ul class="prod">
