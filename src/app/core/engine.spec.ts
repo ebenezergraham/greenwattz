@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   PRICES, priceAgeDays, pricesAreStale,
   Eligibility, grantEligibility,
-  Assumptions, BATTERY_OPTIONS, BATTERY_SIZES, BATTERY_TIERS, BatteryTier, batteryPrice, batteryTierInfo, BandMonthly, bandHours, medianFromBands, profileFromBands, Band, Tariff, bandBreakdown, bandOf, bandsOfDay, blendedRate, dayStats, rateFor, BEST_MAX_GEN_RATIO, CONNECTION_LIMIT_KW, HOUSE_TYPES, ROOF_TYPES, STOREY_ACCESS, roofTypeInfo, DEFAULT_ASSUMPTIONS as A, HomeInputs, MONTH_DAYS, NO_OBSTACLES, Usage,
+  Assumptions, BATTERY_OPTIONS, BATTERY_PRODUCTS, BATTERY_SIZES, BATTERY_TIERS, BatteryTier, batteryPrice, batteryTierInfo, BandMonthly, bandHours, medianFromBands, profileFromBands, Band, Tariff, bandBreakdown, bandOf, bandsOfDay, blendedRate, dayStats, rateFor, BEST_MAX_GEN_RATIO, CONNECTION_LIMIT_KW, HOUSE_TYPES, ROOF_TYPES, STOREY_ACCESS, roofTypeInfo, DEFAULT_ASSUMPTIONS as A, HomeInputs, MONTH_DAYS, NO_OBSTACLES, Usage,
   annualFromBill, annualFromProfile, averageDay, buildGrid, cashflow, loanPayment, paybackRange, exportTaxFor, EXPORT_TAX_RATES, LIFETIME, paybackFrom, project, connectionLimitPanels, costBreakdown, estimateProfile,
   maxPanels, obstacleArea, orientationFactor, pickStrategies, roofFitPanels, seaiGrantFor, shadingFactor, simulate, solarDay,
   splitUsage, systemCost, usableArea, withExtras,
@@ -627,9 +627,15 @@ describe('profiles built from daily band totals', () => {
 describe('battery sizes and prices', () => {
   const tiers: BatteryTier[] = ['value', 'mainstream', 'premium'];
 
-  it('offers the sizes Irish installers actually fit: 5, 10, 13.5 and 15 kWh, plus none', () => {
-    expect(BATTERY_SIZES).toEqual([5, 10, 13.5, 15]);
-    expect(BATTERY_OPTIONS).toEqual([0, 5, 10, 13.5, 15]);
+  it('offers the sizes the main brands sell, plus none', () => {
+    expect(BATTERY_SIZES).toEqual([5, 7, 8, 10, 13.5, 15, 20]);
+    expect(BATTERY_OPTIONS).toEqual([0, ...BATTERY_SIZES]);
+    for (let i = 1; i < BATTERY_SIZES.length; i++) expect(BATTERY_SIZES[i]).toBeGreaterThan(BATTERY_SIZES[i - 1]);
+    expect(BATTERY_SIZES[0]).toBeGreaterThanOrEqual(PRICES.grants.seaiBatteryMinKwh);
+  });
+  it('lists each brand with sizes and a tier', () => {
+    expect(BATTERY_PRODUCTS.length).toBeGreaterThanOrEqual(10);
+    for (const p of BATTERY_PRODUCTS) { expect(p.sizes).toMatch(/\d/); expect(['value', 'mainstream', 'premium']).toContain(p.tier); }
   });
   it('has three tiers with named examples of real products', () => {
     expect(BATTERY_TIERS.map((t) => t.key)).toEqual(tiers);

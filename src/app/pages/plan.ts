@@ -4,7 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
 import { PlanStore } from '../core/store';
-import { Assumptions, BATTERY_SIZES, loanPayment, paybackRange, EXPORT_TAX_RATES, exportTaxFor, PRICES, grantEligibility, seaiGrantFor, BATTERY_GUIDE, BATTERY_OPTIONS, BATTERY_TIERS, BatteryTier, batteryPrice, HOUSE_TYPES, HouseType, OBSTACLES, ObstacleKey, ROOF_TYPES, RoofType, Storeys, Orientation, Occupancy, Shading, Scenario, Tariff, bandsOfDay, simulate, solarDay } from '../core/engine';
+import { Assumptions, BATTERY_PRODUCTS, BATTERY_SIZES, loanPayment, paybackRange, EXPORT_TAX_RATES, exportTaxFor, PRICES, grantEligibility, seaiGrantFor, BATTERY_GUIDE, BATTERY_OPTIONS, BATTERY_TIERS, BatteryTier, batteryPrice, HOUSE_TYPES, HouseType, OBSTACLES, ObstacleKey, ROOF_TYPES, RoofType, Storeys, Orientation, Occupancy, Shading, Scenario, Tariff, bandsOfDay, simulate, solarDay } from '../core/engine';
 import { HdfError, parseHdf } from '../core/hdf';
 import { inferHousehold } from '../core/infer';
 import { CashChart, DayChart, Legend, MonthChart } from '../ui/charts';
@@ -28,6 +28,7 @@ export class PlanPage {
   /** The step lives in the URL (?step=cost), so browser Back and links to a step work. */
   readonly step = signal(0);
   readonly batterySizes = BATTERY_SIZES;
+  readonly products = BATTERY_PRODUCTS;
   readonly lastBattery = signal(10);
   readonly hasBattery = computed(() => this.cfg().batteryKwh > 0);
   setHasBattery(on: boolean) { this.setBattery(on ? this.lastBattery() : 0); }

@@ -343,7 +343,14 @@
                   <div class="seg sizes" role="group" aria-label="Battery size">
                     @for (b of batterySizes; track b) { <button type="button" [attr.aria-pressed]="cfg().batteryKwh === b" (click)="setBattery(b)">{{ b }} kWh</button> }
                   </div>
-                  <p class="hint">The sizes Irish installers usually fit.</p>
+                  <p class="hint">Sizes the main brands sell. Bigger systems stack several modules.</p>
+                  <details class="more">
+                    <summary>Which brands sell which sizes</summary>
+                    <ul class="prod">
+                      @for (p of products; track p.brand) { <li><b>{{ p.brand }}</b><span class="num">{{ p.sizes }}</span><span class="small muted">{{ p.note }}</span></li> }
+                    </ul>
+                    <p class="small muted">From manufacturer product ranges, so check what your installer offers. Capacity is nominal; ask for the usable kWh, which is a little lower.</p>
+                  </details>
                 } @else {
                   <p class="hint">Solar panels alone usually pay back faster. A battery makes sense if you use most of your power in the evening and at night.</p>
                 }
