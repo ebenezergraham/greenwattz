@@ -1,13 +1,14 @@
 import { Component, computed, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
+import { SearchBox } from '../ui/search-box';
 import { SEAI, SeaiCompany, dateFmt, installerFor } from '../core/installers';
 
 const PAGE = 40;
 
 @Component({
   selector: 'page-seai',
-  imports: [RouterLink, DecimalPipe],
+  imports: [RouterLink, DecimalPipe, SearchBox],
   template: `
     <div class="wrap page">
       <h1>SEAI registered solar companies</h1>
@@ -17,7 +18,7 @@ const PAGE = 40;
         <div class="notice info"><i class="ph ph-info"></i><span>{{ all.length | number }} companies from SEAI's public register, imported {{ asOf }}. SEAI updates the register often, so confirm a company on <a [href]="source" target="_blank" rel="noopener noreferrer">SEAI's own page</a> before you sign. Registration is not an endorsement of their work.</span></div>
 
         <div class="controls card">
-          <div class="field"><label for="q">Search by company name</label><input id="q" type="text" [value]="q()" (input)="q.set($any($event.target).value); shown.set(40)" /></div>
+          <search-box label="Search by company name" [items]="names" [(value)]="q" (valueChange)="shown.set(40)" />
           <div class="field"><label for="c">County covered</label>
             <select id="c" aria-label="County covered" [value]="county()" (change)="county.set($any($event.target).value); shown.set(40)">
               <option value="">All counties</option>
@@ -71,6 +72,7 @@ export class SeaiPage {
   readonly asOf = SEAI.asOf ? dateFmt(SEAI.asOf) : '';
   readonly counties = [...new Set(this.all.flatMap((c) => c.counties ?? []))].sort();
   readonly q = signal('');
+  readonly names = this.all.map((c) => c.name);
   readonly county = signal('');
   readonly ratedOnly = signal(false);
   readonly shown = signal(PAGE);

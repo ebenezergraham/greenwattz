@@ -1,13 +1,14 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
+import { SearchBox } from '../ui/search-box';
 import { ALL, Installer, adjusted, dateFmt, mapsUrl, AS_OF, seaiMatch } from '../core/installers';
 
 type Sort = 'adjusted' | 'score' | 'count' | 'name';
 
 @Component({
   selector: 'page-reviews',
-  imports: [RouterLink, DecimalPipe],
+  imports: [RouterLink, DecimalPipe, SearchBox],
   template: `
     <div class="wrap page">
       <h1>Solar installer reviews</h1>
@@ -15,7 +16,7 @@ type Sort = 'adjusted' | 'score' | 'count' | 'name';
       <div class="notice info"><i class="ph ph-info"></i><span>We show each platform's overall score and review count, and link to the reviews themselves. Scores were read from public Trustpilot pages on {{ asOf }}. They change, so check the live page. We do not edit or host the reviews.</span></div>
 
       <div class="controls card">
-        <div class="field"><label for="q">Search installers</label><input id="q" type="text" [value]="q()" (input)="q.set($any($event.target).value)" /></div>
+        <search-box label="Search installers" [items]="names" [(value)]="q" />
         <div class="field"><label for="s">Sort by</label>
           <select id="s" [value]="sort()" (change)="sort.set($any($event.target).value)">
             <option value="adjusted">Best overall (adjusted for review count)</option>
@@ -85,6 +86,7 @@ type Sort = 'adjusted' | 'score' | 'count' | 'name';
 export class ReviewsPage {
   readonly asOf = dateFmt(AS_OF);
   readonly q = signal('');
+  readonly names = ALL.map((i) => i.name);
   readonly sort = signal<Sort>('adjusted');
   readonly min = signal(0);
   mapsUrl = mapsUrl;
