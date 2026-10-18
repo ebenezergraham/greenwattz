@@ -10,7 +10,7 @@ export type UsageMode = 'meter' | 'annual' | 'bill';
 @Injectable({ providedIn: 'root' })
 export class PlanStore {
   readonly home = signal<HomeInputs>({
-    houseType: 'semi', roofType: 'pitched', storeys: 2,
+    houseType: 'semi', roofType: 'pitched', storeys: 2, taxpayers: 1, yearOccupied: null,
     occupancy: 'mixed', orientation: 'S', shading: 'none', roofAreaM2: 25, obstacles: { ...NO_OBSTACLES }, threePhase: false, addEv: false, addHeatPump: false,
   });
   readonly assumptions = signal<Assumptions>({ ...DEFAULT_ASSUMPTIONS });

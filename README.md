@@ -43,4 +43,8 @@ Every price, grant and rate behind the estimates lives in `src/app/data/prices.j
 - **Update:** compare the sources in the file with current figures, edit the values, set `reviewedOn` to today, run `npm test`, push to `main`.
 - **Reminder:** `.github/workflows/price-review.yml` runs monthly and opens a GitHub issue (with the checklist and source links) once a review is within 10 days of due.
 - **Stale warning:** if the file is more than `reviewEveryDays` (60) old, the site tells visitors the prices may be out of date.
-- Battery grant: `grants.seaiBatteryConfirmed` stays `false` until SEAI confirms the 600 euro grant on seai.ie.
+
+## Blog and glossary
+- **Posts** are plain data in `src/app/data/posts.ts`. Add an object with a slug, title, description, date, takeaways, blocks and sources, and it appears at `/blog` and `/blog/<slug>`. Text supports `**bold**` and `[label](url)`; internal links are checked by tests.
+- **Glossary** terms live in `src/app/data/glossary.ts`. Link to a term from anywhere with `[MPRN](/glossary#mprn)`.
+- Tests (`src/app/data/content.spec.ts`) check sources are https, links resolve, no long dashes, and that grant figures in the text match `prices.json`, so a rule change flags what needs updating. Posts describe the rules as of their date, so write a new post instead of silently editing an old one.

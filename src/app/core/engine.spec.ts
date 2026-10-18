@@ -1,13 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import {
   PRICES, priceAgeDays, pricesAreStale,
+  Eligibility, grantEligibility,
   Assumptions, BATTERY_OPTIONS, BATTERY_SIZES, BATTERY_TIERS, BatteryTier, batteryPrice, batteryTierInfo, BandMonthly, bandHours, medianFromBands, profileFromBands, Band, Tariff, bandBreakdown, bandOf, bandsOfDay, blendedRate, dayStats, rateFor, BEST_MAX_GEN_RATIO, CONNECTION_LIMIT_KW, HOUSE_TYPES, ROOF_TYPES, STOREY_ACCESS, roofTypeInfo, DEFAULT_ASSUMPTIONS as A, HomeInputs, MONTH_DAYS, NO_OBSTACLES, Usage,
   annualFromBill, annualFromProfile, averageDay, buildGrid, cashflow, connectionLimitPanels, costBreakdown, estimateProfile,
   maxPanels, obstacleArea, orientationFactor, pickStrategies, roofFitPanels, seaiGrantFor, shadingFactor, simulate, solarDay,
   splitUsage, systemCost, usableArea, withExtras,
 } from './engine';
 
-const HOME: HomeInputs = { houseType: 'semi', roofType: 'pitched', storeys: 2, occupancy: 'mixed', orientation: 'S', shading: 'none', roofAreaM2: 30, obstacles: { ...NO_OBSTACLES }, threePhase: false, addEv: false, addHeatPump: false };
+const HOME: HomeInputs = { houseType: 'semi', roofType: 'pitched', storeys: 2, taxpayers: 1, yearOccupied: null, occupancy: 'mixed', orientation: 'S', shading: 'none', roofAreaM2: 30, obstacles: { ...NO_OBSTACLES }, threePhase: false, addEv: false, addHeatPump: false };
 const home = (p: Partial<HomeInputs> = {}): HomeInputs => ({ ...HOME, ...p, obstacles: { ...NO_OBSTACLES, ...(p.obstacles ?? {}) } });
 const usage = (kwh = 4200, occ: HomeInputs['occupancy'] = 'mixed'): Usage => ({ annualKwh: kwh, profile: estimateProfile(kwh, occ), source: 'estimate' });
 const assump = (p: Partial<Assumptions> = {}): Assumptions => ({ ...A, ...p });
@@ -117,7 +118,7 @@ describe('cost breakdown', () => {
     expect(r.grossLow).toBe(r.breakdown.reduce((t, x) => t + x.low, 0));
     expect(r.grossHigh).toBe(r.breakdown.reduce((t, x) => t + x.high, 0));
     expect(r.grant).toBe(seaiGrantFor(r.kwp));
-    expect(r.netCost).toBe(r.grossCost - r.grant);
+    expect(r.netCost).toBe(r.grossCost - r.grant - r.batteryGrant);
   });
   it('applies no grant when the home does not qualify', () => {
     const r = simulate(usage(), home(), assump({ seaiGrant: false }), { panels: 10, batteryKwh: 0 });
@@ -172,9 +173,9 @@ describe('simulate: energy and money add up', () => {
     expect(r.selfConsumption).toBeGreaterThanOrEqual(0);
     expect(r.selfConsumption).toBeLessThanOrEqual(1);
     expect(r.billAfter).toBeLessThanOrEqual(r.billBefore + 1e-9);
-    expect(r.annualBenefit).toBeCloseTo(r.billSaving + r.exportIncome, 6);
+    expect(r.annualBenefit).toBeCloseTo(r.billSaving + r.exportIncome - r.exportTax, 6);
     expect(r.exportIncome).toBeCloseTo(r.exportKwh * A.exportRate, 6);
-    expect(r.netCost).toBe(r.grossCost - r.grant);
+    expect(r.netCost).toBe(r.grossCost - r.grant - r.batteryGrant);
     if (r.annualBenefit > 0) expect(r.paybackYears).toBeCloseTo(r.netCost / r.annualBenefit, 9);
   });
 
@@ -694,9 +695,11 @@ describe('battery sizes and prices', () => {
 
   describe('optional 600 euro SEAI battery grant', () => {
     const run = (grant: boolean, kwh: number, panels = 10) => simulate(usage(), home(), assump({ seaiBatteryGrant: grant }), { panels, batteryKwh: kwh });
-    it('is off by default because it is not confirmed', () => {
-      expect(A.seaiBatteryGrant).toBe(false);
+    it('is on by default now SEAI has confirmed it, and can be switched off', () => {
+      expect(PRICES.grants.seaiBatteryConfirmed).toBe(true);
+      expect(A.seaiBatteryGrant).toBe(true);
       expect(run(false, 10).batteryGrant).toBe(0);
+      expect(run(true, 10).batteryGrant).toBe(600);
     });
     it('takes 600 off for a battery of 5 kWh or more when switched on', () => {
       const off = run(false, 5), on = run(true, 5);
@@ -763,8 +766,133 @@ describe('price data file', () => {
     expect(A.exportRate).toBe(PRICES.tariffs.export);
     expect(seaiGrantFor(10)).toBe(PRICES.grants.seaiSolarMax);
   });
-  it('keeps the battery grant off by default until it is confirmed', () => {
-    expect(PRICES.grants.seaiBatteryConfirmed).toBe(false);
-    expect(A.seaiBatteryGrant).toBe(false);
+  it('has sane export tax settings: the announced limit is above the one in force', () => {
+    expect(PRICES.tax.exportExemptionInForcePerPerson).toBe(400);
+    expect(PRICES.tax.exportExemptionPerPerson).toBeGreaterThanOrEqual(PRICES.tax.exportExemptionInForcePerPerson);
+    expect(PRICES.tax.exportTaxRate).toBeGreaterThan(0.1);
+    expect(PRICES.tax.exportTaxRate).toBeLessThan(0.6);
+  });
+  it('lists official SEAI links for the grants, as web addresses', () => {
+    for (const k of ['solarGrant', 'batteryGrant', 'enhanced', 'howToApply', 'installers'] as const) expect(PRICES.links[k]).toMatch(/^https:\/\/www\.seai\.ie\//);
+    expect(PRICES.sources.some((x) => x.url === PRICES.links.batteryGrant)).toBe(true);
+  });
+  it('has grant rules matching SEAI: 600 euro battery from 5 kWh, homes occupied before 2025', () => {
+    expect(PRICES.grants.seaiBattery).toBe(600);
+    expect(PRICES.grants.seaiBatteryMinKwh).toBe(5);
+    expect(PRICES.grants.seaiSolarBuiltBefore).toBe(2025);
+    expect(PRICES.grants.seaiBatteryBuiltBefore).toBe(2025);
+  });
+});
+
+describe('tax on export income', () => {
+  // a big, south-facing system on a modest home exports a lot: good for exercising the allowance
+  const run = (taxpayers: 1 | 2, a: Partial<Assumptions> = {}, panels = 13) =>
+    simulate(usage(2000), home({ roofAreaM2: 60, taxpayers }), assump({ exportRate: 0.32, ...a }), { panels, batteryKwh: 0 });
+
+  it('uses the announced 600 euro per person by default, per the price file', () => {
+    expect(A.exportTaxFreePerPerson).toBe(PRICES.tax.exportExemptionPerPerson);
+    expect(A.exportTaxFreePerPerson).toBe(600);
+    expect(A.exportTaxRate).toBe(PRICES.tax.exportTaxRate);
+  });
+  it('gives each person on the bill their own allowance: 600 for one, 1,200 for two', () => {
+    expect(run(1).exportTaxFree).toBe(600);
+    expect(run(2).exportTaxFree).toBe(1200);
+  });
+  it('charges no tax on export income inside the allowance', () => {
+    const r = simulate(usage(), home({ taxpayers: 1 }), assump({ exportRate: 0.1 }), { panels: 8, batteryKwh: 0 });
+    expect(r.exportIncome).toBeLessThan(600);
+    expect(r.exportTax).toBe(0);
+    expect(r.annualBenefit).toBeCloseTo(r.billSaving + r.exportIncome, 9);
+  });
+  it('taxes only the part above the allowance, at the chosen rate', () => {
+    const r = run(1);
+    expect(r.exportIncome).toBeGreaterThan(600);
+    expect(r.exportTax).toBeCloseTo((r.exportIncome - 600) * A.exportTaxRate, 9);
+    expect(run(1, { exportTaxRate: 0.48 }).exportTax).toBeCloseTo((r.exportIncome - 600) * 0.48, 9);
+  });
+  it('two people pay less tax than one on the same export income, and the difference is the extra allowance', () => {
+    const one = run(1), two = run(2);
+    expect(two.exportIncome).toBeCloseTo(one.exportIncome, 9);
+    expect(two.exportIncome).toBeGreaterThan(1200); // test only means something if both are over their allowance
+    expect(two.exportTax).toBeLessThan(one.exportTax);
+    expect(one.exportTax - two.exportTax).toBeCloseTo(600 * A.exportTaxRate, 9);
+  });
+  it('shows up in the benefit, the payback and the cash flow', () => {
+    const one = run(1), two = run(2);
+    expect(one.annualBenefit).toBeCloseTo(one.billSaving + one.exportIncome - one.exportTax, 9);
+    expect(two.annualBenefit).toBeGreaterThan(one.annualBenefit);
+    expect(two.paybackYears).toBeLessThan(one.paybackYears);
+    expect(cashflow(two, A)[1].cumulative).toBeGreaterThan(cashflow(one, A)[1].cumulative);
+  });
+  it('does not change the cost, the bill saving or what is exported', () => {
+    const one = run(1), two = run(2);
+    expect(two.netCost).toBe(one.netCost);
+    expect(two.billSaving).toBeCloseTo(one.billSaving, 9);
+    expect(two.exportKwh).toBeCloseTo(one.exportKwh, 9);
+  });
+  it('lets the user use the limit in force (400) instead, which means more tax', () => {
+    const announced = run(1), inForce = run(1, { exportTaxFreePerPerson: PRICES.tax.exportExemptionInForcePerPerson });
+    expect(inForce.exportTaxFree).toBe(400);
+    expect(inForce.exportTax).toBeGreaterThan(announced.exportTax);
+    expect(inForce.exportTax - announced.exportTax).toBeCloseTo(200 * A.exportTaxRate, 9);
+  });
+  it('is zero when nothing is exported or there are no panels', () => {
+    expect(simulate(usage(), home(), A, { panels: 0, batteryKwh: 0 }).exportTax).toBe(0);
+  });
+  it('makes the recommendation less keen on oversizing for exports', () => {
+    const best = (kwh: number, payers: 1 | 2) => pickStrategies(buildGrid(usage(kwh), home({ roofAreaM2: 100, taxpayers: payers }), assump({ exportRate: 0.3 })))[1];
+    // with two allowances the optimiser can justify at least as many panels as with one
+    expect(best(2500, 2).panels).toBeGreaterThanOrEqual(best(2500, 1).panels);
+  });
+});
+
+describe('SEAI grant eligibility by year occupied', () => {
+  const at = (y: number | null) => grantEligibility({ yearOccupied: y }, new Date('2026-10-18'));
+  const run = (year: number | null, kwh = 10, a: Partial<Assumptions> = {}) => simulate(usage(), home({ yearOccupied: year }), assump(a), { panels: 10, batteryKwh: kwh });
+
+  it('says unknown until the year is given, and for impossible years', () => {
+    for (const y of [null, NaN, 1500, 2100]) expect(at(y as number | null)).toEqual({ solar: 'unknown', battery: 'unknown', yearValid: false });
+  });
+  it('makes homes occupied before 2025 eligible for both grants', () => {
+    for (const y of [1850, 1975, 2004, 2020, 2024]) expect(at(y)).toEqual({ solar: 'eligible', battery: 'eligible', yearValid: true });
+  });
+  it('makes homes first occupied in 2025 or later ineligible', () => {
+    for (const y of [2025, 2026]) expect(at(y)).toEqual({ solar: 'ineligible', battery: 'ineligible', yearValid: true });
+  });
+  it('applies both grants to an eligible home', () => {
+    const r = run(1998);
+    expect(r.grant).toBe(seaiGrantFor(r.kwp));
+    expect(r.batteryGrant).toBe(600);
+  });
+  it('takes both grants off for a home occupied in 2025 or later, raising the net cost by exactly that much', () => {
+    const ok = run(1998), no = run(2025);
+    expect(no.grant).toBe(0);
+    expect(no.batteryGrant).toBe(0);
+    expect(no.netCost).toBe(ok.netCost + ok.grant + ok.batteryGrant);
+    expect(no.grossCost).toBe(ok.grossCost);
+    expect(no.paybackYears).toBeGreaterThan(ok.paybackYears);
+  });
+  it('assumes the grants apply while the year is unknown, so the user sees the typical case', () => {
+    const unknown = run(null), ok = run(1998);
+    expect(unknown.grant).toBe(ok.grant);
+    expect(unknown.batteryGrant).toBe(ok.batteryGrant);
+  });
+  it('only gives the battery grant for batteries of 5 kWh or more', () => {
+    expect(run(1998, 0).batteryGrant).toBe(0);
+    expect(run(1998, 5).batteryGrant).toBe(600);
+    expect(run(1998, 15).batteryGrant).toBe(600);
+  });
+  it('lets the user switch either grant off', () => {
+    expect(run(1998, 10, { seaiGrant: false }).grant).toBe(0);
+    expect(run(1998, 10, { seaiGrant: false }).batteryGrant).toBe(600);
+    expect(run(1998, 10, { seaiBatteryGrant: false }).batteryGrant).toBe(0);
+    expect(run(1998, 10, { seaiBatteryGrant: false }).grant).toBeGreaterThan(0);
+  });
+  it('never makes the net cost negative', () => {
+    expect(run(1998, 5).netCost).toBeGreaterThanOrEqual(0);
+  });
+  it('is checked against the price-file cut-off years, so changing them changes eligibility', () => {
+    expect(at(PRICES.grants.seaiSolarBuiltBefore - 1).solar).toBe('eligible');
+    expect(at(PRICES.grants.seaiSolarBuiltBefore).solar).toBe('ineligible');
   });
 });

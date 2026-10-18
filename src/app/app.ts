@@ -17,11 +17,25 @@ const KEY = 'greenwattz.consent.v1';
         </a>
         <nav aria-label="Main">
           <a routerLink="/plan" routerLinkActive="on">Plan</a>
-          <a routerLink="/guide/esb-data" routerLinkActive="on">Meter data</a>
           <a routerLink="/reviews" routerLinkActive="on">Reviews</a>
           <a routerLink="/quote" routerLinkActive="on">Get quotes</a>
+          <a routerLink="/blog" routerLinkActive="on">Guides</a>
+          <a routerLink="/glossary" routerLinkActive="on">Glossary</a>
         </nav>
-        <a routerLink="/plan" class="btn primary sm">Start planning</a>
+        <div class="right">
+          <a routerLink="/plan" class="btn primary sm">Start planning</a>
+          <details class="menu" #m>
+            <summary aria-label="Open menu">Menu</summary>
+            <nav aria-label="Mobile" (click)="m.open = false">
+              <a routerLink="/plan">Plan</a>
+              <a routerLink="/reviews">Reviews</a>
+              <a routerLink="/quote">Get quotes</a>
+              <a routerLink="/blog">Guides</a>
+              <a routerLink="/glossary">Glossary</a>
+              <a routerLink="/guide/esb-data">Meter data</a>
+            </nav>
+          </details>
+        </div>
       </div>
     </header>
     <main id="main"><router-outlet /></main>
@@ -34,6 +48,8 @@ const KEY = 'greenwattz.consent.v1';
         <div class="links">
           <a routerLink="/privacy">Privacy policy</a>
           <a routerLink="/cookies">Cookie policy</a>
+          <a routerLink="/blog">Guides</a>
+          <a routerLink="/glossary">Glossary</a>
           <a routerLink="/estimates">How we estimate</a>
           <a routerLink="/guide/esb-data">How to get your ESB data</a>
           <a routerLink="/seai-installers">SEAI registered installers</a>
@@ -72,7 +88,13 @@ const KEY = 'greenwattz.consent.v1';
     nav { display: flex; gap: 4px; }
     nav a { color: var(--ink-2); text-decoration: none; padding: 8px 14px; border-radius: var(--r-ctl); font-weight: 550; }
     nav a:hover, nav a.on { color: var(--ink); background: var(--surface-2); }
-    @media (max-width: 760px) { nav { display: none; } }
+    .right { display: flex; align-items: center; gap: 10px; }
+    .menu { display: none; position: relative; }
+    .menu summary { list-style: none; cursor: pointer; min-height: 38px; padding: 0 14px; display: inline-flex; align-items: center; border: 1px solid var(--ink-3); border-radius: var(--r-ctl); font-weight: 600; font-size: 0.9rem; }
+    .menu summary::-webkit-details-marker { display: none; }
+    .menu nav { display: grid; position: absolute; right: 0; top: calc(100% + 8px); min-width: 200px; padding: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-surf); box-shadow: var(--shadow); z-index: var(--z-nav); }
+    .menu nav a { padding: 12px 14px; border-radius: 8px; }
+    @media (max-width: 760px) { header nav[aria-label='Main'] { display: none; } .menu { display: block; } }
     main { min-height: 70dvh; }
     footer { margin-top: 96px; border-top: 1px solid var(--line); padding: 40px 0 32px; }
     .foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 32px; }

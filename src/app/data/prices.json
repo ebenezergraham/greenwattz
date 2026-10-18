@@ -12,7 +12,12 @@
     "seaiSolarNext2kwpPerKwp": 200,
     "seaiSolarMax": 1800,
     "seaiBattery": 600,
-    "seaiBatteryConfirmed": false
+    "seaiBatteryConfirmed": true,
+    "seaiSolarBuiltBefore": 2025,
+    "seaiBatteryBuiltBefore": 2025,
+    "seaiBatteryMinKwh": 5,
+    "seaiBatteryOpened": "2026-10-06",
+    "seaiEnhancedMax": 9000
   },
   "tariffs": {
     "flat": 0.34,
@@ -23,20 +28,138 @@
     "standingChargeMonthly": 35
   },
   "battery": {
-    "value": [ { "kwh": 5, "low": 4000, "high": 5200 }, { "kwh": 10, "low": 5500, "high": 7500 } ],
-    "mainstream": [ { "kwh": 5, "low": 4500, "high": 5500 }, { "kwh": 10, "low": 6500, "high": 8000 }, { "kwh": 15, "low": 8500, "high": 10500 } ],
-    "premium": [ { "kwh": 5, "low": 5000, "high": 6500 }, { "kwh": 10, "low": 7000, "high": 9000 }, { "kwh": 13.5, "low": 9000, "high": 12000 } ]
+    "value": [
+      {
+        "kwh": 5,
+        "low": 4000,
+        "high": 5200
+      },
+      {
+        "kwh": 10,
+        "low": 5500,
+        "high": 7500
+      }
+    ],
+    "mainstream": [
+      {
+        "kwh": 5,
+        "low": 4500,
+        "high": 5500
+      },
+      {
+        "kwh": 10,
+        "low": 6500,
+        "high": 8000
+      },
+      {
+        "kwh": 15,
+        "low": 8500,
+        "high": 10500
+      }
+    ],
+    "premium": [
+      {
+        "kwh": 5,
+        "low": 5000,
+        "high": 6500
+      },
+      {
+        "kwh": 10,
+        "low": 7000,
+        "high": 9000
+      },
+      {
+        "kwh": 13.5,
+        "low": 9000,
+        "high": 12000
+      }
+    ]
   },
   "sources": [
-    { "what": "Solar installed cost", "label": "Selectra Ireland, cost of solar panels", "url": "https://selectra.ie/energy/guides/solar-panels/cost" },
-    { "what": "Solar installed cost", "label": "Purevolt, solar panel cost and returns", "url": "https://www.purevolt.ie/domestic-solar/solar-panels-cost-and-returns.php" },
-    { "what": "Solar grant", "label": "SEAI, solar electricity grant", "url": "https://www.seai.ie/grants/home-energy-grants/individual-grants/solar-electricity-grant" },
-    { "what": "Battery prices by brand and size", "label": "SolarInfo.ie, solar battery storage Ireland", "url": "https://www.solarinfo.ie/solar-battery-storage" },
-    { "what": "Battery prices and sizes", "label": "Kilovolt, home battery storage guide", "url": "https://kv.ie/guides/batteries/" },
-    { "what": "Battery prices and brands", "label": "EnergyHero, solar battery cost Ireland", "url": "https://energyhero.ie/solar-battery-cost-ireland/" },
-    { "what": "Battery grant (unconfirmed)", "label": "Irish Times, battery grant expected in budget", "url": "https://www.irishtimes.com/politics/2026/09/25/grant-of-600-for-solar-panel-batteries-set-to-be-announced-in-budget/" },
-    { "what": "Export rates", "label": "Selectra Ireland, best microgeneration rates", "url": "https://selectra.ie/energy/guides/prices/best-microgeneration-rates-ireland" },
-    { "what": "Time-of-use bands", "label": "Electric Ireland, time of use tariffs", "url": "https://www.electricireland.ie/residential/help/smart-electricity-meters/time-of-use-tariffs-for-residential-customers" },
-    { "what": "Home connection limits", "label": "ESB Networks, micro-generation", "url": "https://www.esbnetworks.ie/customer-support/customer-support-queries/generator-connections/connecting-mini-generator" }
-  ]
+    {
+      "what": "Solar installed cost",
+      "label": "Selectra Ireland, cost of solar panels",
+      "url": "https://selectra.ie/energy/guides/solar-panels/cost"
+    },
+    {
+      "what": "Solar installed cost",
+      "label": "Purevolt, solar panel cost and returns",
+      "url": "https://www.purevolt.ie/domestic-solar/solar-panels-cost-and-returns.php"
+    },
+    {
+      "what": "Solar grant",
+      "label": "SEAI, solar electricity grant",
+      "url": "https://www.seai.ie/grants/home-energy-grants/individual-grants/solar-electricity-grant"
+    },
+    {
+      "what": "Battery prices by brand and size",
+      "label": "SolarInfo.ie, solar battery storage Ireland",
+      "url": "https://www.solarinfo.ie/solar-battery-storage"
+    },
+    {
+      "what": "Battery prices and sizes",
+      "label": "Kilovolt, home battery storage guide",
+      "url": "https://kv.ie/guides/batteries/"
+    },
+    {
+      "what": "Battery prices and brands",
+      "label": "EnergyHero, solar battery cost Ireland",
+      "url": "https://energyhero.ie/solar-battery-cost-ireland/"
+    },
+    {
+      "what": "Export rates",
+      "label": "Selectra Ireland, best microgeneration rates",
+      "url": "https://selectra.ie/energy/guides/prices/best-microgeneration-rates-ireland"
+    },
+    {
+      "what": "Time-of-use bands",
+      "label": "Electric Ireland, time of use tariffs",
+      "url": "https://www.electricireland.ie/residential/help/smart-electricity-meters/time-of-use-tariffs-for-residential-customers"
+    },
+    {
+      "what": "Home connection limits",
+      "label": "ESB Networks, micro-generation",
+      "url": "https://www.esbnetworks.ie/customer-support/customer-support-queries/generator-connections/connecting-mini-generator"
+    },
+    {
+      "what": "Export income tax exemption",
+      "label": "Energy Efficiency, home solar power and tax in Ireland",
+      "url": "https://energyefficiency.ie/blog/home-solar-power-and-tax-in-ireland/"
+    },
+    {
+      "what": "Export income tax exemption",
+      "label": "Climate Jargon Buster, microgeneration explained",
+      "url": "https://climatejargonbuster.ie/kb/microgeneration/"
+    },
+    {
+      "what": "Battery grant",
+      "label": "SEAI, battery energy storage system grant",
+      "url": "https://www.seai.ie/grants/home-energy-grants/individual-grants/battery"
+    },
+    {
+      "what": "Enhanced grants",
+      "label": "SEAI, enhanced grants announcement",
+      "url": "https://www.seai.ie/news-and-events/news/enhanced-grants"
+    },
+    {
+      "what": "Grant conditions",
+      "label": "SEAI, solar PV terms and conditions",
+      "url": "https://www.seai.ie/sites/default/files/2024-09/Solar-PV-Terms-And-Conditions.pdf"
+    }
+  ],
+  "tax": {
+    "exportExemptionPerPerson": 600,
+    "exportExemptionInForcePerPerson": 400,
+    "exportTaxRate": 0.28,
+    "note": "Export income is exempt from income tax, USC and PRSI up to a limit per person. The limit in force has been 400 euro a year. Budget 2027 announced 600, with the start date still to be legislated. Above the limit it is taxed at your marginal rate, roughly 28 percent at the standard rate including USC and PRSI, and more at the higher rate."
+  },
+  "links": {
+    "solarGrant": "https://www.seai.ie/grants/home-energy-grants/individual-grants/solar-electricity-grant",
+    "batteryGrant": "https://www.seai.ie/grants/home-energy-grants/individual-grants/battery",
+    "enhanced": "https://www.seai.ie/news-and-events/news/enhanced-grants",
+    "howToApply": "https://www.seai.ie/grants/home-energy-grants/individual-grants/support-for-individual-grants",
+    "installers": "https://www.seai.ie/grants/find-a-registered-professional/solar-pv-companies",
+    "terms": "https://www.seai.ie/sites/default/files/2024-09/Solar-PV-Terms-And-Conditions.pdf",
+    "govEnergyUpgrades": "https://www.gov.ie/en/department-of-climate-energy-and-the-environment/publications/energy-upgrades/"
+  }
 }

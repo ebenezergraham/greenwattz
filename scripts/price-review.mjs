@@ -12,7 +12,7 @@ console.log(`Prices were last reviewed on **${p.reviewedOn}** (${age} days ago).
 
 ## Do this
 1. Open each source below and compare it with \`src/app/data/prices.json\`: installed solar cost, battery prices by tier and size, grant amounts, typical rates.
-2. Check whether the reported 600 euro SEAI battery grant is now confirmed on seai.ie. If so, set \`grants.seaiBatteryConfirmed\` to true and decide whether to default it on.
+2. Check the SEAI solar and battery grant pages for changes to amounts, cut-off years or eligibility. If so, set \`grants.seaiBatteryConfirmed\` to true and decide whether to default it on.
 3. Update the values, then set \`reviewedOn\` to today's date.
 4. Run \`npm test\` (it checks the numbers stay sensible), then push to main to deploy.
 

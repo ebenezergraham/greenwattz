@@ -105,6 +105,11 @@ figcaption { display: grid; gap: 2px; margin-bottom: 12px; }
 .disc .check { align-items: flex-start; }
 .nav-btns { display: flex; justify-content: space-between; margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--line); }
 .checklist { margin-top: 28px; ul { padding-left: 20px; margin: 12px 0 0; display: grid; gap: 6px; font-size: 0.92rem; color: var(--ink-2); max-width: 62ch; } }
+input.short { max-width: 200px; }
+.links { margin: 14px 0 0; padding-left: 18px; display: grid; gap: 6px; font-size: 0.92rem; a { color: var(--accent); } }
+.grants td:nth-child(2) { max-width: 34ch; }
 .print-only { display: none; }
 @media print { .print-only { display: block; margin-top: 24px; } .disc, .more { display: none; } }
+.calc { margin: 10px 0 0; font-size: 1rem; color: var(--ink-2); b { color: var(--ink); font-weight: 650; } }
+.opt-row .r span.small { display: block; font-weight: 400; white-space: normal; }
 .linklike { background: none; border: 0; padding: 0; font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }

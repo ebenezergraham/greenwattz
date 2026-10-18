@@ -2,7 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
 import { PlanStore } from '../core/store';
-import { Assumptions, PRICES, BATTERY_GUIDE, BATTERY_OPTIONS, BATTERY_TIERS, BatteryTier, batteryPrice, HOUSE_TYPES, HouseType, OBSTACLES, ObstacleKey, ROOF_TYPES, RoofType, Storeys, Orientation, Occupancy, Shading, Scenario, Tariff, bandsOfDay, simulate, solarDay } from '../core/engine';
+import { Assumptions, PRICES, grantEligibility, seaiGrantFor, BATTERY_GUIDE, BATTERY_OPTIONS, BATTERY_TIERS, BatteryTier, batteryPrice, HOUSE_TYPES, HouseType, OBSTACLES, ObstacleKey, ROOF_TYPES, RoofType, Storeys, Orientation, Occupancy, Shading, Scenario, Tariff, bandsOfDay, simulate, solarDay } from '../core/engine';
 import { HdfError, parseHdf } from '../core/hdf';
 import { CashChart, DayChart, Legend, MonthChart } from '../ui/charts';
 import { EstimateNote } from '../ui/estimate-note';
@@ -73,6 +73,46 @@ export class PlanPage {
     const kwh = this.cfg().batteryKwh || 10;
     const p = batteryPrice(t.key, kwh);
     return `${t.blurb} ${kwh} kWh costs about ${this.eur(p.low)} to ${this.eur(p.high)} installed. Examples: ${t.examples.slice(0, 2).join(', ')}.`;
+  });
+  readonly links = PRICES.links;
+  readonly grantsCfg = PRICES.grants;
+  readonly batteryOpened = new Date(PRICES.grants.seaiBatteryOpened + 'T00:00:00Z').toLocaleDateString('en-IE', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+  readonly thisYear = new Date().getFullYear();
+  readonly elig = computed(() => grantEligibility(this.s.home()));
+  setYear(e: Event) {
+    const raw = (e.target as HTMLInputElement).value.trim();
+    this.s.patchHome({ yearOccupied: raw === '' ? null : Math.round(+raw) });
+  }
+  readonly yearHint = computed(() => {
+    const y = this.s.home().yearOccupied, e = this.elig(), cut = PRICES.grants.seaiSolarBuiltBefore;
+    if (y == null || !e.yearValid) return `SEAI's solar and battery grants need a home built and occupied before ${cut}. Enter the year to check. Until then we assume you qualify.`;
+    return e.solar === 'eligible'
+      ? `Occupied before ${cut}, so the home meets SEAI's age rule for the solar and battery grants.`
+      : `Homes first occupied in ${cut} or later are not eligible for SEAI's solar or battery grants, so we have taken both off your costs.`;
+  });
+  /** What each grant means for this plan, in plain words. */
+  readonly grantRows = computed(() => {
+    const e = this.elig(), a = this.s.assumptions(), r = this.r(), g = PRICES.grants, cut = g.seaiSolarBuiltBefore;
+    const unknown = e.solar === 'unknown';
+    const solar = !a.seaiGrant ? 'You switched this grant off in the assumptions.'
+      : e.solar === 'ineligible' ? `Not eligible: first occupied in ${this.s.home().yearOccupied}, after the ${cut} cut-off.`
+      : unknown ? 'Assumed eligible. Enter the year your home was first occupied in step 1 to check.'
+      : 'Eligible on age. Other conditions below also apply.';
+    const hasBattery = this.cfg().batteryKwh > 0;
+    const battery = e.battery === 'ineligible' ? `Not eligible: first occupied in ${this.s.home().yearOccupied}, after the ${cut} cut-off.`
+      : !hasBattery ? `No battery in this plan. A battery of ${g.seaiBatteryMinKwh} kWh or more would qualify.`
+      : !a.seaiBatteryGrant ? 'You switched this grant off in the assumptions.'
+      : unknown ? 'Assumed eligible. Enter the year your home was first occupied in step 1 to check.'
+      : 'Eligible on age. Other conditions below also apply.';
+    return {
+      solar: { text: solar, amount: r.grant ? this.eur(r.grant) : (e.solar === 'ineligible' || !a.seaiGrant ? 'Not applied' : this.eur(seaiGrantFor(r.kwp))) },
+      battery: { text: battery, amount: r.batteryGrant ? this.eur(r.batteryGrant) : 'Not applied' },
+    };
+  });
+  setPayers(n: 1 | 2) { this.s.patchHome({ taxpayers: n }); }
+  readonly payersHint = computed(() => {
+    const per = this.s.assumptions().exportTaxFreePerPerson, n = this.s.home().taxpayers;
+    return `Export income is tax-free up to ${this.eur(per)} for each person named on the bill, so ${this.eur(per * n)} for ${n === 1 ? 'one person' : 'two'}. Above that it is taxed.`;
   });
   readonly isMedian = computed(() => !!this.s.usage().median);
   /** True for the daily night/day/peak file: band totals are measured, hours inside a band are estimated. */

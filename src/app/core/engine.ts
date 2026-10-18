@@ -11,7 +11,9 @@ export interface PriceData {
   reviewedOn: string;
   reviewEveryDays: number;
   solar: { costBase: number; costPerKwp: number; yieldPerKwp: number; note: string };
-  grants: { seaiSolarFirst2kwpPerKwp: number; seaiSolarNext2kwpPerKwp: number; seaiSolarMax: number; seaiBattery: number; seaiBatteryConfirmed: boolean };
+  grants: { seaiSolarFirst2kwpPerKwp: number; seaiSolarNext2kwpPerKwp: number; seaiSolarMax: number; seaiBattery: number; seaiBatteryConfirmed: boolean; seaiSolarBuiltBefore: number; seaiBatteryBuiltBefore: number; seaiBatteryMinKwh: number; seaiBatteryOpened: string; seaiEnhancedMax: number };
+  links: { solarGrant: string; batteryGrant: string; enhanced: string; howToApply: string; installers: string; terms: string; govEnergyUpgrades: string };
+  tax: { exportExemptionPerPerson: number; exportExemptionInForcePerPerson: number; exportTaxRate: number; note: string };
   tariffs: { flat: number; day: number; night: number; peak: number; export: number; standingChargeMonthly: number };
   battery: Record<'value' | 'mainstream' | 'premium', { kwh: number; low: number; high: number }[]>;
   sources: PriceSource[];
@@ -119,8 +121,12 @@ export interface Assumptions {
   batteryTier: BatteryTier;
   batteryEfficiency: number;
   seaiGrant: boolean;
-  /** The reported 600 euro SEAI battery grant. Off by default: not confirmed on SEAI's own site when written. */
+  /** Count the SEAI battery grant (600 euro for 5 kWh or more) when the home is eligible. */
   seaiBatteryGrant: boolean;
+  /** Export income that is tax-free for each person on the bill (euro a year). 600 is announced; 400 is the limit in force. */
+  exportTaxFreePerPerson: number;
+  /** Tax on export income above the allowance: about 0.28 at the standard rate incl. USC and PRSI, about 0.48 at the higher rate. */
+  exportTaxRate: number;
   co2KgPerKwh: number;
 }
 
@@ -141,7 +147,9 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
   batteryTier: 'mainstream',
   batteryEfficiency: 0.9,
   seaiGrant: true,
-  seaiBatteryGrant: false,
+  seaiBatteryGrant: PRICES.grants.seaiBatteryConfirmed,
+  exportTaxFreePerPerson: PRICES.tax.exportExemptionPerPerson,
+  exportTaxRate: PRICES.tax.exportTaxRate,
   co2KgPerKwh: 0.3,
 };
 
@@ -201,6 +209,10 @@ export interface HomeInputs {
   houseType: HouseType;
   roofType: RoofType;
   storeys: Storeys;
+  /** People named on the electricity bill who would each get the tax-free export allowance. */
+  taxpayers: 1 | 2;
+  /** Year the home was first occupied. SEAI grants need a home built and occupied before a cut-off year. Null until the user says. */
+  yearOccupied: number | null;
   occupancy: Occupancy;
   orientation: Orientation;
   shading: Shading;
@@ -455,6 +467,8 @@ export interface Result {
   billAfter: number;
   billSaving: number;
   exportIncome: number;
+  exportTaxFree: number; // allowance available across the people on the bill
+  exportTax: number; // tax paid on export income above the allowance
   annualBenefit: number;
   grossCost: number;
   grossLow: number;
@@ -467,6 +481,17 @@ export interface Result {
   monthlyGen: number[];
   monthlyDemand: number[];
   co2Tonnes: number;
+}
+
+export type Eligibility = 'eligible' | 'ineligible' | 'unknown';
+export interface GrantEligibility { solar: Eligibility; battery: Eligibility; yearValid: boolean }
+
+/** SEAI solar and battery grants both need a home built and occupied before a cut-off year (2025 at the time of writing). */
+export function grantEligibility(h: Pick<HomeInputs, 'yearOccupied'>, now: Date = new Date()): GrantEligibility {
+  const y = h.yearOccupied;
+  if (y == null || !Number.isFinite(y) || y < 1700 || y > now.getFullYear() + 1) return { solar: 'unknown', battery: 'unknown', yearValid: false };
+  const g = PRICES.grants;
+  return { solar: y < g.seaiSolarBuiltBefore ? 'eligible' : 'ineligible', battery: y < g.seaiBatteryBuiltBefore ? 'eligible' : 'ineligible', yearValid: true };
 }
 
 export function seaiGrantFor(kwp: number): number {
@@ -597,17 +622,20 @@ export function simulate(usage: Usage, home: HomeInputs, a: Assumptions, cfg: Co
   const gross = breakdown.reduce((t, r) => t + r.mid, 0);
   const grossLow = breakdown.reduce((t, r) => t + r.low, 0);
   const grossHigh = breakdown.reduce((t, r) => t + r.high, 0);
-  const grant = a.seaiGrant && kwp > 0 ? seaiGrantFor(kwp) : 0;
-  const batteryGrant = a.seaiBatteryGrant && cap >= 5 && kwp > 0 ? PRICES.grants.seaiBattery : 0;
+  const elig = grantEligibility(home);
+  const grant = a.seaiGrant && kwp > 0 && elig.solar !== 'ineligible' ? seaiGrantFor(kwp) : 0;
+  const batteryGrant = a.seaiBatteryGrant && cap >= PRICES.grants.seaiBatteryMinKwh && kwp > 0 && elig.battery !== 'ineligible' ? PRICES.grants.seaiBattery : 0;
   const net = Math.max(0, gross - grant - batteryGrant);
   const saving = billBefore - billAfter;
-  const benefit = saving + exportIncome;
+  const exportTaxFree = a.exportTaxFreePerPerson * home.taxpayers;
+  const exportTax = Math.max(0, exportIncome - exportTaxFree) * a.exportTaxRate;
+  const benefit = saving + exportIncome - exportTax;
   return {
     kwp, panels: cfg.panels, batteryKwh: cap,
     generationKwh: gen, selfUseKwh: self, exportKwh: exp, importKwh: imp, baselineImportKwh: baseImp,
     selfSufficiency: baseImp ? self / baseImp : 0,
     selfConsumption: gen ? self / gen : 0,
-    billBefore, billAfter, billSaving: saving, exportIncome, annualBenefit: benefit,
+    billBefore, billAfter, billSaving: saving, exportIncome, exportTaxFree, exportTax, annualBenefit: benefit,
     grossCost: gross, grossLow, grossHigh, breakdown,
     grant, batteryGrant, netCost: net,
     paybackYears: benefit > 0 ? net / benefit : Infinity,

@@ -25,8 +25,9 @@ import { INSTALLER_CHECKLIST, SITE } from '../core/site';
             @for (t of tiers; track t.key) {
               <tr><td>{{ t.label }} battery</td><td class="num">{{ t.range }}</td><td>Installed price range at 5 to 15 kWh. Examples: {{ t.examples }}.</td></tr>
             }
-            <tr><td>SEAI solar grant</td><td class="num">€{{ PRICES.grants.seaiSolarFirst2kwpPerKwp }}/kWp for the first 2 kWp, €{{ PRICES.grants.seaiSolarNext2kwpPerKwp }}/kWp up to 4 kWp, max €{{ PRICES.grants.seaiSolarMax | number }}</td><td>SEAI's published scheme. Eligibility rules apply.</td></tr>
-            <tr><td>SEAI battery grant</td><td class="num">Off by default</td><td>A €{{ PRICES.grants.seaiBattery }} grant has been reported but we could not confirm it on SEAI's site.</td></tr>
+            <tr><td>SEAI solar grant</td><td class="num">€{{ PRICES.grants.seaiSolarFirst2kwpPerKwp }}/kWp for the first 2 kWp, €{{ PRICES.grants.seaiSolarNext2kwpPerKwp }}/kWp up to 4 kWp, max €{{ PRICES.grants.seaiSolarMax | number }}</td><td>For homes built and occupied before {{ PRICES.grants.seaiSolarBuiltBefore }}. <a [href]="PRICES.links.solarGrant" target="_blank" rel="noopener noreferrer">SEAI rules</a>.</td></tr>
+            <tr><td>SEAI battery grant</td><td class="num">€{{ PRICES.grants.seaiBattery }} for {{ PRICES.grants.seaiBatteryMinKwh }} kWh or more</td><td>For homes built and occupied before {{ PRICES.grants.seaiBatteryBuiltBefore }}. <a [href]="PRICES.links.batteryGrant" target="_blank" rel="noopener noreferrer">SEAI rules</a>.</td></tr>
+            <tr><td>Tax on export income</td><td class="num">€{{ A.exportTaxFreePerPerson }} tax-free per person, then about {{ c(A.exportTaxRate) }}</td><td>{{ PRICES.tax.note }}</td></tr>
             <tr><td>Electricity rates</td><td class="num">Day {{ c(A.dayRate) }}, night {{ c(A.nightRate) }}, peak {{ c(A.peakRate) }}, export {{ c(A.exportRate) }}</td><td>Typical starting figures. You enter your own rates.</td></tr>
             <tr><td>Solar output</td><td class="num">{{ A.yieldPerKwp }} kWh per kWp a year facing south</td><td>Adjusted for roof direction, shade and month.</td></tr>
           </tbody>

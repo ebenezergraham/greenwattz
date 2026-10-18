@@ -205,7 +205,10 @@ export class QuotePage {
     return [
       'Solar quote request (planned with GreenWattz)',
       `Yearly electricity use: about ${Math.round(u.annualKwh)} kWh`,
+      `Estimated cost: ${Math.round(r.grossCost / 50) * 50} euro installed, less ${Math.round((r.grant + r.batteryGrant) / 50) * 50} euro SEAI grants, about ${Math.round(r.netCost / 50) * 50} euro after grants (planning estimate)`,
       `Suggested system: ${r.panels} panels (${r.kwp.toFixed(1)} kWp)${r.batteryKwh ? ' with a ' + r.batteryKwh + ' kWh battery' : ', no battery'}`,
+      `People on the bill: ${h.taxpayers}`,
+      `Home first occupied: ${h.yearOccupied ?? 'not given'}`,
       `Home: ${HOUSE_LABEL[h.houseType]}, ${h.storeys === 3 ? '3 or more storeys' : h.storeys + ' storey' + (h.storeys > 1 ? 's' : '')}, ${roofTypeInfo(h.roofType).label.toLowerCase()} roof`,
       `Roof: faces ${ori}, shade ${h.shading}, about ${Math.round(this.store.usableArea())} m2 usable after obstacles${this.obstacleText()}`,
       `Supply: ${h.threePhase ? 'three-phase' : 'single-phase'}`,

@@ -1,6 +1,7 @@
 import { Component, computed, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
+import { POSTS } from '../data/posts';
 import { DEFAULT_ASSUMPTIONS, HomeInputs, buildGrid, estimateProfile, pickStrategies } from '../core/engine';
 
 @Component({
@@ -60,6 +61,14 @@ import { DEFAULT_ASSUMPTIONS, HomeInputs, buildGrid, estimateProfile, pickStrate
       </article>
     </section>
 
+    <section class="wrap learn">
+      <h2>New to solar?</h2>
+      <ul>
+        <li><a [routerLink]="['/blog', latest.slug]">{{ latest.title }}</a><span class="muted small">{{ latest.description }}</span></li>
+        <li><a routerLink="/glossary">Glossary</a><span class="muted small">kWp, MPRN, SEAI grants and more, in plain English.</span></li>
+      </ul>
+    </section>
+
     <section class="wrap honest">
       <h2>What we do not do</h2>
       <p>We are not an installer and we do not sell your details. Results are estimates from a typical day in each month, so use them to ask better questions, then get written quotes.</p>
@@ -88,12 +97,14 @@ import { DEFAULT_ASSUMPTIONS, HomeInputs, buildGrid, estimateProfile, pickStrate
       i { font-size: 2.6rem; } a { color: inherit; font-weight: 600; } }
     .ie { background: var(--surface); border: 1px solid var(--line); }
     .reviews { background: var(--surface-2); justify-items: start; }
+    .learn { padding-bottom: 56px; display: grid; gap: 14px; ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 16px; } li { display: grid; gap: 2px; max-width: 62ch; } li a { font-weight: 600; font-size: 1.05rem; } }
     .honest { padding-bottom: 24px; display: grid; gap: 14px; p { max-width: 62ch; color: var(--ink-2); font-size: 1.1rem; } }
   `,
 })
 export class HomePage {
+  readonly latest = [...POSTS].sort((a, b) => b.date.localeCompare(a.date))[0];
   readonly kwh = signal(4200);
-  private home: HomeInputs = { houseType: 'semi', roofType: 'pitched', storeys: 2, occupancy: 'mixed', orientation: 'S', shading: 'none', roofAreaM2: 30, obstacles: { chimney: 0, skylight: 0, vent: 0, dish: 0, dormer: 0, thermal: 0 }, threePhase: false, addEv: false, addHeatPump: false };
+  private home: HomeInputs = { houseType: 'semi', roofType: 'pitched', storeys: 2, taxpayers: 1, yearOccupied: null, occupancy: 'mixed', orientation: 'S', shading: 'none', roofAreaM2: 30, obstacles: { chimney: 0, skylight: 0, vent: 0, dish: 0, dormer: 0, thermal: 0 }, threePhase: false, addEv: false, addHeatPump: false };
   readonly best = computed(() => {
     const u = { annualKwh: this.kwh(), profile: estimateProfile(this.kwh(), 'mixed'), source: 'estimate' as const };
     return pickStrategies(buildGrid(u, this.home, DEFAULT_ASSUMPTIONS))[1];

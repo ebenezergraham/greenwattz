@@ -54,6 +54,13 @@
                 <p class="hint">{{ roofHint() }}</p>
               </div>
             </div>
+            <div class="q">
+              <label class="ql" for="year">Year first occupied</label>
+              <div class="qc">
+                <input id="year" class="short" type="number" inputmode="numeric" min="1700" [max]="thisYear" step="1" placeholder="For example 1998" [value]="s.home().yearOccupied ?? ''" (change)="setYear($event)" />
+                <p class="hint" [class.warn]="elig().solar === 'ineligible'">{{ yearHint() }} <a [href]="links.solarGrant" target="_blank" rel="noopener noreferrer">SEAI grant rules</a></p>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -150,6 +157,16 @@
               <div class="qc">
                 <label class="check"><input type="checkbox" [checked]="s.home().threePhase" (change)="s.patchHome({ threePhase: $any($event.target).checked })" /><span>Three-phase supply</span></label>
                 <p class="hint">Uncommon in homes. Single-phase limits a system to about 6 kW, three-phase to about 11 kW.</p>
+              </div>
+            </div>
+            <div class="q">
+              <span class="ql" id="payers">People on the bill</span>
+              <div class="qc">
+                <div class="seg" role="group" aria-labelledby="payers">
+                  <button type="button" [attr.aria-pressed]="s.home().taxpayers === 1" (click)="setPayers(1)">One person</button>
+                  <button type="button" [attr.aria-pressed]="s.home().taxpayers === 2" (click)="setPayers(2)">Two people</button>
+                </div>
+                <p class="hint">{{ payersHint() }}</p>
               </div>
             </div>
           </div>
@@ -269,7 +286,7 @@
         <estimate-note />
 
         <div class="opts" role="radiogroup" aria-label="Starting point">
-          <div class="opts-head" aria-hidden="true"><span>Option</span><span>System</span><span class="r">You pay</span><span class="r">Payback</span><span class="r">Covers</span></div>
+          <div class="opts-head" aria-hidden="true"><span>Option</span><span>System</span><span class="r">You pay after grants</span><span class="r">Payback</span><span class="r">Covers</span></div>
           @for (x of s.strategies(); track x.key) {
             <button type="button" role="radio" class="opt-row" [attr.aria-checked]="isPicked(x)" (click)="pickStrategy(x)">
               <span class="nm">
@@ -277,7 +294,7 @@
                 <span class="t"><b>{{ x.label }}</b>@if (x.key === 'best') { <em>Recommended</em> }<span class="small muted">{{ x.blurb }}</span></span>
               </span>
               <span class="sy num">{{ x.kwp | number: '1.1-1' }} kWp<span class="small muted">{{ x.panels }} panels{{ x.batteryKwh ? ', ' + x.batteryKwh + ' kWh battery' : ', no battery' }}</span></span>
-              <span class="r num" data-l="You pay">{{ eur0(x.netCost) }}</span>
+              <span class="r num" data-l="You pay">{{ eur0(x.netCost) }}<span class="small muted">{{ x.grant + x.batteryGrant ? eur0(x.grossCost) + ' less ' + eur0(x.grant + x.batteryGrant) + ' grants' : eur0(x.grossCost) + ', no grants' }}</span></span>
               <span class="r num" data-l="Payback">{{ payback(x.paybackYears) }}</span>
               <span class="r num" data-l="Covers">{{ pc(x.selfSufficiency) }}</span>
             </button>
@@ -294,7 +311,7 @@
               <label class="ql" for="panels">Solar panels</label>
               <div class="qc">
                 <div class="slide"><input id="panels" type="range" min="2" [max]="s.maxPanels()" step="1" [value]="cfg().panels" (input)="setPanels($event)" /><output class="num" for="panels">{{ cfg().panels }}</output></div>
-                <p class="hint num">{{ r().kwp | number: '1.2-2' }} kWp, about {{ cfg().panels * s.assumptions().panelAreaM2 }} m² of roof. Most Irish homes install 8 to 14 panels. Your roof fits up to {{ s.maxPanels() }}.</p>
+                <p class="hint num">{{ r().kwp | number: '1.2-2' }} <a routerLink="/glossary" fragment="kwp">kWp</a>, about {{ cfg().panels * s.assumptions().panelAreaM2 }} m² of roof. Most Irish homes install 8 to 14 panels. Your roof fits up to {{ s.maxPanels() }}.</p>
               </div>
             </div>
             <div class="q">
@@ -340,6 +357,7 @@
         <section class="grp">
           <h2>Do you need a battery?</h2>
           <p class="prose">{{ batteryVerdict().text }}</p>
+          <p class="hint">SEAI pays a €{{ grantsCfg.seaiBattery }} <a routerLink="/glossary" fragment="battery-grant">grant</a> towards a battery of {{ grantsCfg.seaiBatteryMinKwh }} kWh or more fitted by a registered solar installer, if your home qualifies. <a [href]="links.batteryGrant" target="_blank" rel="noopener noreferrer">SEAI battery grant</a></p>
           <details class="more">
             <summary>Which size suits whom</summary>
             <ul class="guide">
@@ -362,7 +380,8 @@
       @if (step() === 3) {
         <h1>Cost and return</h1>
         <p class="answer">{{ r().panels }} panels ({{ r().kwp | number: '1.1-1' }} kWp){{ r().batteryKwh ? ' with a ' + r().batteryKwh + ' kWh battery' : ' and no battery' }}. You would pay about <strong class="num">{{ eur0(r().netCost) }}</strong> after grants, get about <strong class="num">{{ eur0(r().annualBenefit) }}</strong> a year back, and break even in <strong class="num">{{ payback(r().paybackYears) }}</strong>.</p>
-        <p class="hint">Typical installed range before grants: {{ eur0(r().grossLow) }} to {{ eur0(r().grossHigh) }}. The yearly benefit is {{ eur0(r().billSaving) }} off your bill plus {{ eur0(r().exportIncome) }} from exports.</p>
+        <p class="calc num">{{ eur0(r().grossCost) }} installed@if (r().grant) { - {{ eur0(r().grant) }} SEAI solar grant }@if (r().batteryGrant) { - {{ eur0(r().batteryGrant) }} SEAI battery grant } = <b>{{ eur0(r().netCost) }}</b> you pay @if (!r().grant && !r().batteryGrant) { <span class="muted">(no SEAI grants applied, see SEAI grants below)</span> }</p>
+        <p class="hint">Typical installed range before grants: {{ eur0(r().grossLow) }} to {{ eur0(r().grossHigh) }}. The yearly benefit is {{ eur0(r().billSaving) }} off your bill plus {{ eur0(r().exportIncome - r().exportTax) }} from exports{{ r().exportTax ? ' after tax' : ', tax-free' }}.</p>
 
         <estimate-note />
 
@@ -378,6 +397,8 @@
                 <div><dt>Solar generated</dt><dd class="num">{{ r().generationKwh | number: '1.0-0' }} kWh/yr</dd></div>
                 <div><dt>Used at home</dt><dd class="num">{{ pc(r().selfConsumption) }}</dd></div>
                 <div><dt>Exported</dt><dd class="num">{{ r().exportKwh | number: '1.0-0' }} kWh/yr</dd></div>
+                <div><dt>Export income</dt><dd class="num">{{ eur0(r().exportIncome) }}/yr</dd></div>
+                @if (r().exportTax) { <div><dt>Tax on export income</dt><dd class="num">-{{ eur0(r().exportTax) }}/yr</dd></div> }
                 <div><dt>Your usage covered</dt><dd class="num">{{ pc(r().selfSufficiency) }}</dd></div>
                 <div><dt>CO₂ avoided</dt><dd class="num">{{ r().co2Tonnes | number: '1.1-1' }} t/yr</dd></div>
               </dl>
@@ -404,9 +425,43 @@
               </tfoot>
             </table>
           </div>
-          @if (r().exportIncome > 400) {
-            <p class="hint warn">This plan earns about {{ eur0(r().exportIncome) }} a year from exports. The first €400 a year has been tax-exempt, but income above that may be taxable. Check Revenue's current rules.</p>
+          @if (r().exportIncome > 0) {
+            @if (r().exportTax > 0) {
+              <p class="hint warn">Your export income of about {{ eur0(r().exportIncome) }} a year is above the tax-free allowance of {{ eur0(r().exportTaxFree) }} ({{ s.home().taxpayers }} {{ s.home().taxpayers === 1 ? 'person' : 'people' }} x {{ eur0(s.assumptions().exportTaxFreePerPerson) }}). The excess is taxed at about {{ pc(s.assumptions().exportTaxRate) }}, which costs about {{ eur0(r().exportTax) }} a year. That is already taken off the figures above.</p>
+            } @else {
+              <p class="hint">Your export income of about {{ eur0(r().exportIncome) }} a year is within the tax-free allowance of {{ eur0(r().exportTaxFree) }}, so no tax is taken off.</p>
+            }
           }
+        </section>
+
+        <section class="grp">
+          <h2>SEAI grants</h2>
+          <div class="tablewrap">
+            <table class="tbl grants">
+              <thead><tr><th>Grant</th><th>For your plan</th><th class="r">Amount</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><b>Solar PV grant</b><span class="small muted">€{{ grantsCfg.seaiSolarFirst2kwpPerKwp }} per kWp for the first 2 kWp, €{{ grantsCfg.seaiSolarNext2kwpPerKwp }} per kWp up to 4 kWp, maximum €{{ grantsCfg.seaiSolarMax | number }}.</span></td>
+                  <td>{{ grantRows().solar.text }}</td>
+                  <td class="r num">{{ grantRows().solar.amount }}</td>
+                </tr>
+                <tr>
+                  <td><b>Battery grant</b><span class="small muted">€{{ grantsCfg.seaiBattery }} for a battery of {{ grantsCfg.seaiBatteryMinKwh }} kWh or more, opened {{ batteryOpened }}.</span></td>
+                  <td>{{ grantRows().battery.text }}</td>
+                  <td class="r num">{{ grantRows().battery.amount }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="hint">You also need to: own the home, have an <a routerLink="/glossary" fragment="mprn">MPRN</a>, have had no earlier SEAI funding at that MPRN, use an SEAI-registered installer, and receive your grant offer <b>before</b> any work starts. You then have 8 months to finish. A BER assessment is needed before payment.</p>
+          <ul class="links">
+            <li><a [href]="links.solarGrant" target="_blank" rel="noopener noreferrer">SEAI: solar electricity grant</a></li>
+            <li><a [href]="links.batteryGrant" target="_blank" rel="noopener noreferrer">SEAI: battery grant</a></li>
+            <li><a [href]="links.howToApply" target="_blank" rel="noopener noreferrer">SEAI: how to apply</a></li>
+            <li><a [href]="links.installers" target="_blank" rel="noopener noreferrer">SEAI: registered solar installers</a></li>
+            <li><a [href]="links.enhanced" target="_blank" rel="noopener noreferrer">SEAI: enhanced grants, up to €{{ grantsCfg.seaiEnhancedMax | number }} for some welfare recipients</a></li>
+          </ul>
+          <p class="hint">Grant rules change. Always check the SEAI pages above before you apply.</p>
         </section>
 
         <details class="more checklist">
@@ -421,9 +476,12 @@
               <div class="field"><label for="a4">Yearly energy price rise (%)</label><input id="a4" type="number" step="0.5" [value]="s.assumptions().tariffInflation * 100" (input)="setAssump('tariffInflation', pct($event))" /></div>
               <div class="field"><label for="a5">Installed cost base (€)</label><input id="a5" type="number" step="100" [value]="s.assumptions().panelCostBase" (input)="setAssump('panelCostBase', num($event))" /></div>
               <div class="field"><label for="a6">Installed cost per kWp (€)</label><input id="a6" type="number" step="50" [value]="s.assumptions().panelCostPerKwp" (input)="setAssump('panelCostPerKwp', num($event))" /></div>
+              <div class="field"><label for="a8">Tax-free export income per person (€ a year)</label><input id="a8" type="number" step="50" [value]="s.assumptions().exportTaxFreePerPerson" (change)="setAssump('exportTaxFreePerPerson', num($event))" /></div>
+              <div class="field"><label for="a9">Tax rate above the allowance (%)</label><input id="a9" type="number" step="1" [value]="s.assumptions().exportTaxRate * 100" (change)="setAssump('exportTaxRate', pct($event))" /></div>
             </div>
-            <label class="check"><input type="checkbox" [checked]="s.assumptions().seaiGrant" (change)="setAssump('seaiGrant', $any($event.target).checked)" /><span>My home qualifies for the SEAI solar grant <span class="muted small">Generally homes built and occupied before 2021, an SEAI-registered installer, and approval before work starts.</span></span></label>
-            <label class="check"><input type="checkbox" [checked]="s.assumptions().seaiBatteryGrant" (change)="setAssump('seaiBatteryGrant', $any($event.target).checked)" /><span>Include a €600 SEAI battery grant <span class="muted small">Reported for batteries of 5 kWh or more, but we could not confirm it on SEAI's own site. Leave this off unless SEAI confirms it applies to you.</span></span></label>
+            <p class="hint">€400 a person is the limit in force. Budget 2027 announced €600, with the start date still to be set, and we use €600. The rate is about 28% at the standard rate including USC and PRSI, and about 48% at the higher rate. Check Revenue's current rules.</p>
+            <label class="check"><input type="checkbox" [checked]="s.assumptions().seaiGrant" (change)="setAssump('seaiGrant', $any($event.target).checked)" /><span>Count the SEAI solar grant <span class="muted small">Applied when your home qualifies on age. See SEAI grants above.</span></span></label>
+            <label class="check"><input type="checkbox" [checked]="s.assumptions().seaiBatteryGrant" (change)="setAssump('seaiBatteryGrant', $any($event.target).checked)" /><span>Count the SEAI battery grant <span class="muted small">Applied for a battery of 5 kWh or more when your home qualifies on age.</span></span></label>
             <p class="hint">Unit rates and the export rate are on <button class="linklike" type="button" (click)="go(1)">step 2</button>.</p>
           </div>
         </details>
@@ -452,6 +510,8 @@
         <div><dt>Yearly use</dt><dd class="num">{{ s.usage().annualKwh | number: '1.0-0' }} kWh</dd></div>
         <div><dt>Panels</dt><dd class="num">{{ cfg().panels }} ({{ r().kwp | number: '1.1-1' }} kWp)</dd></div>
         <div><dt>Battery</dt><dd class="num">{{ cfg().batteryKwh ? cfg().batteryKwh + ' kWh' : 'None' }}</dd></div>
+        <div><dt>Installed</dt><dd class="num">{{ eur0(r().grossCost) }}</dd></div>
+        <div><dt>SEAI grants</dt><dd class="num">{{ r().grant + r().batteryGrant ? '-' + eur0(r().grant + r().batteryGrant) : 'None' }}</dd></div>
         <div class="tot"><dt>You pay</dt><dd class="num">{{ eur0(r().netCost) }}</dd></div>
         <div><dt>Payback</dt><dd class="num">{{ payback(r().paybackYears) }}</dd></div>
       </dl>

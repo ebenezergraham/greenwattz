@@ -6,6 +6,9 @@ import { ProviderPage, ReviewsPage } from './pages/reviews';
 import { QuotePage } from './pages/quote';
 import { SeaiPage } from './pages/seai';
 import { EstimatesPage } from './pages/estimates';
+import { BlogPage, PostPage } from './pages/blog';
+import { GlossaryPage } from './pages/glossary';
+import { postBySlug } from './data/posts';
 import { CookiesPage, PrivacyPage } from './pages/legal';
 
 export const routes: Routes = [
@@ -16,6 +19,9 @@ export const routes: Routes = [
   { path: 'reviews/:slug', component: ProviderPage, title: 'Installer reviews | GreenWattz' },
   { path: 'seai-installers', component: SeaiPage, title: 'SEAI registered solar companies | GreenWattz' },
   { path: 'estimates', component: EstimatesPage, title: 'How we estimate | GreenWattz' },
+  { path: 'blog', component: BlogPage, title: 'Guides and news | GreenWattz' },
+  { path: 'blog/:slug', component: PostPage, title: (route) => { const p = postBySlug(route.paramMap.get('slug')); return (p ? p.title : 'Article not found') + ' | GreenWattz'; } },
+  { path: 'glossary', component: GlossaryPage, title: 'Solar glossary for Irish homeowners | GreenWattz' },
   { path: 'quote', component: QuotePage, title: 'Find installers | GreenWattz' },
   { path: 'privacy', component: PrivacyPage, title: 'Privacy policy | GreenWattz' },
   { path: 'cookies', component: CookiesPage, title: 'Cookie policy | GreenWattz' },
