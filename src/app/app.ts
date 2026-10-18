@@ -35,6 +35,7 @@ const KEY = 'greenwattz.consent.v1';
           <a routerLink="/privacy">Privacy policy</a>
           <a routerLink="/cookies">Cookie policy</a>
           <a routerLink="/guide/esb-data">How to get your ESB data</a>
+          <a routerLink="/seai-installers">SEAI registered installers</a>
           <button class="linklike" type="button" (click)="reopen()">Cookie settings</button>
         </div>
       </div>

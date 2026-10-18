@@ -15,3 +15,15 @@ Angular 22 solar planner for Irish homes. 100% client-side: no backend, no data 
     npx ng build && firebase deploy --only hosting
 
 Buy the domain (greenwattz.eu was unregistered when checked on 17 Oct 2026), then connect it in Firebase Console > Hosting > Add custom domain.
+
+## SEAI register of solar PV companies
+SEAI blocks automated requests, so the list is imported from a file you download in a browser:
+
+1. Open https://www.seai.ie/grants/find-a-registered-professional/solar-pv-companies and download the results as CSV.
+2. `npm run import:seai -- path/to/file.csv` writes `src/app/data/seai-registered.json`.
+3. Commit and push. The `/seai-installers` page, the "SEAI" badges on ratings and quotes, and the "SEAI registered" chip update automatically.
+
+Matching to rated installers is by website domain or exact company name only, so a missing badge means "not matched", not "not registered". Re-import every few weeks, as the register changes.
+
+## Refreshing ratings
+`npm run sync:ratings` updates Trustpilot and Google ratings from their APIs (needs `TRUSTPILOT_API_KEY` and/or `GOOGLE_PLACES_API_KEY`).

@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
 import { PlanStore } from '../core/store';
 import { INTRODUCTION_INSTALLERS, SITE } from '../core/site';
-import { Installer, PRIORITIES, Priority, rank, siteUrl, mapsUrl } from '../core/installers';
+import { Installer, PRIORITIES, Priority, rank, siteUrl, mapsUrl, seaiMatch } from '../core/installers';
 
 const LEVELS = [
   { v: 0, label: 'Skip' },
@@ -44,6 +44,7 @@ const LEVELS = [
                   <div class="head">
                     <h3>{{ r.installer.name }}</h3>
                     <span class="chip">{{ r.installer.kind }}</span>
+                    @if (seai(r.installer)) { <span class="chip"><i class="ph-fill ph-seal-check"></i> SEAI registered</span> }
                   </div>
                   <p class="small muted"><i class="ph-fill ph-star"></i> Trustpilot <b class="num">{{ r.installer.trustpilot!.score | number: '1.1-1' }}</b> from <span class="num">{{ r.installer.trustpilot!.count | number }}</span> reviews.
                     @if (r.installer.google) { Google <b class="num">{{ r.installer.google.rating | number: '1.1-1' }}</b> from <span class="num">{{ r.installer.google.count | number }}</span>. }
@@ -182,6 +183,7 @@ export class QuotePage {
   toggle(slug: string) { this.picked.update((s) => { const n = new Set(s); n.has(slug) ? n.delete(slug) : n.add(slug); return n; }); if (!this.introFor().length) this.wantsIntro.set(null); }
   names(keys: Priority[]) { return keys.map((k) => PRIORITIES.find((p) => p.key === k)!.label.toLowerCase()).join(', '); }
   maps(i: Installer) { return mapsUrl(i); }
+  seai(i: Installer) { return !!seaiMatch(i); }
   siteOf(i: Installer) { return siteUrl(i); }
   round50(n: number) { return Math.round(n / 50) * 50; }
 

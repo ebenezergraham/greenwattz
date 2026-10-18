@@ -1,4 +1,5 @@
 import ratings from '../data/installer-ratings.json';
+import seai from '../data/seai-registered.json';
 
 export interface Source { score?: number; rating?: number; count: number; url: string; asOf: string }
 
@@ -55,4 +56,29 @@ export function rank(weights: Record<Priority, number>, minReviews = 100): Ranke
       return { installer: i, score, reputation, backed };
     })
     .sort((a, b) => b.score - a.score || b.installer.trustpilot!.count - a.installer.trustpilot!.count);
+}
+
+export interface SeaiCompany { name: string; county?: string; address?: string; phone?: string; website?: string; scope?: string }
+export const SEAI = seai as { asOf: string | null; source: string; companies: SeaiCompany[] };
+
+const norm = (s: string) =>
+  s.toLowerCase().replace(/&/g, 'and').replace(/\b(ltd|limited|plc|dac|solar|energies|energy|ireland|the|and)\b/g, '').replace(/[^a-z0-9]/g, '');
+function domainOf(u?: string): string {
+  if (!u) return '';
+  try { return new URL(/^https?:/i.test(u) ? u : 'https://' + u).hostname.replace(/^www\./, ''); } catch { return ''; }
+}
+
+/** Finds the SEAI register entry by website domain, then by exact normalised name. Never fuzzy, to avoid false badges. */
+export function seaiMatch(i: Installer): SeaiCompany | undefined {
+  const dom = i.domain.replace(/^www\./, '');
+  const byDomain = SEAI.companies.find((c) => domainOf(c.website) === dom);
+  if (byDomain) return byDomain;
+  const n = norm(i.name);
+  if (n.length < 5) return undefined;
+  return SEAI.companies.find((c) => { const m = norm(c.name); return m.length >= 5 && m === n; });
+}
+
+/** Reverse lookup: the rated installer (if any) for an SEAI company. */
+export function installerFor(c: SeaiCompany): Installer | undefined {
+  return ALL.find((i) => seaiMatch(i) === c);
 }

@@ -6,7 +6,9 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "import:seai": "node scripts/import-seai.mjs",
+    "sync:ratings": "node scripts/sync-ratings.mjs"
   },
   "private": true,
   "packageManager": "npm@11.17.0",

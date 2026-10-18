@@ -1,7 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
-import { ALL, Installer, adjusted, dateFmt, mapsUrl, AS_OF } from '../core/installers';
+import { ALL, Installer, adjusted, dateFmt, mapsUrl, AS_OF, seaiMatch } from '../core/installers';
 
 type Sort = 'adjusted' | 'score' | 'count' | 'name';
 
@@ -36,7 +36,7 @@ type Sort = 'adjusted' | 'score' | 'count' | 'name';
         <div class="providers">
           @for (i of list(); track i.slug) {
             <article class="card prov">
-              <div class="head"><div><h2><a [routerLink]="['/reviews', i.slug]">{{ i.name }}</a></h2><span class="small muted">{{ i.kind }}</span></div></div>
+              <div class="head"><div><h2><a [routerLink]="['/reviews', i.slug]">{{ i.name }}</a></h2><span class="small muted">{{ i.kind }}</span></div>@if (seai(i)) { <span class="chip" title="Found on the SEAI register of solar PV companies"><i class="ph-fill ph-seal-check"></i> SEAI</span> }</div>
               <div class="src">
                 <div class="where"><i class="ph-fill ph-star"></i><span>Trustpilot</span></div>
                 @if (i.trustpilot; as t) {
@@ -88,6 +88,7 @@ export class ReviewsPage {
   readonly sort = signal<Sort>('adjusted');
   readonly min = signal(0);
   mapsUrl = mapsUrl;
+  seai = (i: Installer) => !!seaiMatch(i);
   readonly list = computed(() => {
     const q = this.q().trim().toLowerCase(), min = this.min(), s = this.sort();
     const t = (i: Installer) => i.trustpilot;
@@ -119,6 +120,7 @@ const TOPICS = [
         <a routerLink="/reviews" class="small">All installers</a>
         <h1>{{ inst.name }}</h1>
         <p class="muted">{{ inst.kind }}</p>
+        @if (seai()) { <p><span class="chip"><i class="ph-fill ph-seal-check"></i> Found on the SEAI register of solar PV companies</span></p> }
 
         <div class="srcs">
           <div class="card">
@@ -179,5 +181,6 @@ export class ProviderPage {
   readonly i = signal(ALL.find((x) => x.slug === this.slug));
   readonly topics = TOPICS;
   date = dateFmt;
+  seai = () => { const x = this.i(); return !!x && !!seaiMatch(x); };
   maps() { const x = this.i(); return x ? mapsUrl(x) : '#'; }
 }
