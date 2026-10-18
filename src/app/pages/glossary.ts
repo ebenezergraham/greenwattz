@@ -63,8 +63,8 @@ const letterOf = (t: Term) => t.term.replace(/[^A-Za-z]/g, '').charAt(0).toUpper
     .term p { margin: 6px 0 0; max-width: 66ch; }
     .term .more { color: var(--ink-2); font-size: 0.95rem; }
     .term .see { font-size: 0.875rem; color: var(--ink-3); }
-    .term .see a { color: var(--accent); }
-    .term:target h3 { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 6px; }
+    .term .see a { color: var(--link); }
+    .term:target h3 { text-decoration: underline; text-decoration-color: var(--sun-strong); text-underline-offset: 6px; }
     .empty { margin-top: 32px; color: var(--ink-2); }
     .cta { margin-top: 40px; display: flex; gap: 12px; flex-wrap: wrap; }
   `,

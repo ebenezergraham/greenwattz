@@ -28,7 +28,7 @@ import { Component, computed, input, model, signal } from '@angular/core';
     .wrap { position: relative; }
     .list { position: absolute; z-index: 15; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: 6px; list-style: none; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-ctl); box-shadow: var(--shadow); max-height: 320px; overflow-y: auto; }
     li { padding: 10px 12px; border-radius: 7px; cursor: pointer; }
-    li.on, li:hover { background: var(--accent-soft); }
+    li.on, li:hover { background: var(--surface-2); }
     b { font-weight: 700; }
   `,
 })

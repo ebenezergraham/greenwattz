@@ -43,7 +43,7 @@ import { RouterLink } from '@angular/router';
     .lead { font-size: 1.15rem; color: var(--ink-2); }
     .steps { margin: 0; padding: 0; list-style: none; counter-reset: s; display: grid; gap: 0; }
     .steps li { counter-increment: s; position: relative; padding: 0 0 28px 56px; border-left: 0; }
-    .steps li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); font-weight: 650; }
+    .steps li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: var(--sun); color: var(--on-sun); font-weight: 650; }
     .steps li::after { content: ''; position: absolute; left: 18px; top: 44px; bottom: 6px; width: 2px; background: var(--line); }
     .steps li:last-child::after { display: none; }
     .steps p { color: var(--ink-2); margin-top: 4px; }

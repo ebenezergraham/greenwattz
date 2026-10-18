@@ -237,6 +237,8 @@ export interface Usage {
   medianDaily?: number;
   /** Measured daily kWh per rate band, when the file holds daily night/day/peak totals instead of hourly readings. */
   bands?: BandMonthly;
+  /** The file has export readings, so the home may already have solar. */
+  hasExport?: boolean;
 }
 
 /**
@@ -478,6 +480,11 @@ export interface Result {
   batteryGrant: number;
   netCost: number;
   paybackYears: number;
+  /** Today's price of the parts that wear out sooner than the panels, used for the replacement years in the projection. */
+  inverterCost: number;
+  batteryCost: number;
+  /** Money in hand after 25 years once the cost, replacements and tax are counted. */
+  netGain: number;
   monthlyGen: number[];
   monthlyDemand: number[];
   co2Tonnes: number;
@@ -630,6 +637,9 @@ export function simulate(usage: Usage, home: HomeInputs, a: Assumptions, cfg: Co
   const exportTaxFree = a.exportTaxFreePerPerson * home.taxpayers;
   const exportTax = Math.max(0, exportIncome - exportTaxFree) * a.exportTaxRate;
   const benefit = saving + exportIncome - exportTax;
+  const inverterCost = breakdown.find((r) => r.key === 'inverter')?.mid ?? 0;
+  const batteryCost = breakdown.filter((r) => r.group === 'battery').reduce((t, r) => t + r.mid, 0);
+  const flow = project({ billSaving: saving, exportIncome, exportTaxFree, netCost: net, inverterCost, batteryCost }, a);
   return {
     kwp, panels: cfg.panels, batteryKwh: cap,
     generationKwh: gen, selfUseKwh: self, exportKwh: exp, importKwh: imp, baselineImportKwh: baseImp,
@@ -638,11 +648,28 @@ export function simulate(usage: Usage, home: HomeInputs, a: Assumptions, cfg: Co
     billBefore, billAfter, billSaving: saving, exportIncome, exportTaxFree, exportTax, annualBenefit: benefit,
     grossCost: gross, grossLow, grossHigh, breakdown,
     grant, batteryGrant, netCost: net,
-    paybackYears: benefit > 0 ? net / benefit : Infinity,
+    paybackYears: benefit > 0 ? paybackFrom(flow) : Infinity,
+    inverterCost, batteryCost, netGain: flow[flow.length - 1].cumulative,
     monthlyGen, monthlyDemand,
     co2Tonnes: (self * a.co2KgPerKwh) / 1000,
   };
 }
+
+export interface ExportTaxLine { people: number; allowance: number; taxable: number; tax: number; kept: number }
+
+/** What a year of export income leaves after tax, for a given number of people on the bill. */
+export function exportTaxFor(income: number, people: number, a: Assumptions): ExportTaxLine {
+  const allowance = a.exportTaxFreePerPerson * people;
+  const taxable = Math.max(0, income - allowance);
+  const tax = taxable * a.exportTaxRate;
+  return { people, allowance, taxable, tax, kept: income - tax };
+}
+
+/** Standard and higher rate income tax with USC and PRSI, as a rough guide to the tax on export income above the allowance. */
+export const EXPORT_TAX_RATES = [
+  { rate: 0.28, label: 'Standard rate', hint: 'About 28% with USC and PRSI' },
+  { rate: 0.48, label: 'Higher rate', hint: 'About 48% with USC and PRSI' },
+];
 
 export interface Scenario extends Result { label: string; blurb: string; key: string; }
 
@@ -663,8 +690,8 @@ export function buildGrid(usage: Usage, home: HomeInputs, a: Assumptions): Resul
 export const BEST_MAX_GEN_RATIO = 1.25;
 export const BOLD_MAX_GEN_RATIO = 1.5;
 
-export function pickStrategies(grid: Result[], years = 20): Scenario[] {
-  const value = (r: Result) => r.annualBenefit * years * 0.92 - r.netCost; // 8% allowance for degradation
+export function pickStrategies(grid: Result[]): Scenario[] {
+  const value = (r: Result) => r.netGain;
   const viable = grid.filter((r) => isFinite(r.paybackYears));
   const pool = viable.length ? viable : grid;
   // Selling surplus power is worth less and less certain than using it, so cap how much we oversize.
@@ -684,20 +711,103 @@ export function pickStrategies(grid: Result[], years = 20): Scenario[] {
   ];
 }
 
-export interface Cashflow { year: number; cumulative: number; }
+export interface Cashflow {
+  year: number;
+  cumulative: number;
+  /** Bill saving plus export income less export tax in this year. */
+  benefit: number;
+  /** Cost of replacing the inverter or battery in this year, if any. */
+  replacement: number;
+}
 
-export function cashflow(r: Result, a: Assumptions, years = 25): Cashflow[] {
-  const out: Cashflow[] = [];
-  let cum = -r.netCost;
-  out.push({ year: 0, cumulative: cum });
+/** Assumptions for the long view. Inverters and batteries wear out before panels, and replacements cost less than today's price. */
+export const LIFETIME = {
+  years: 25,
+  panelAgeing: 0.005, // output lost a year
+  inverterYear: 13,
+  inverterCostShare: 0.8,
+  batteryYear: 15,
+  batteryCostShare: 0.6,
+};
+
+export interface ProjectionInput {
+  billSaving: number; // year-one bill saving
+  exportIncome: number; // year-one export income
+  exportTaxFree: number; // allowance for everyone on the bill
+  netCost: number; // after grants
+  inverterCost: number;
+  batteryCost: number;
+}
+
+/**
+ * Year-by-year money. Panels age, the bill saving rises with electricity prices, export income stays at today's rate
+ * (the rate is not guaranteed to rise), export tax is worked out each year, and the inverter and battery are replaced.
+ */
+export function project(p: ProjectionInput, a: Assumptions, years = LIFETIME.years): Cashflow[] {
+  const out: Cashflow[] = [{ year: 0, cumulative: -p.netCost, benefit: 0, replacement: 0 }];
+  let cum = -p.netCost;
   for (let y = 1; y <= years; y++) {
-    const degr = Math.pow(0.995, y - 1);
-    const infl = Math.pow(1 + a.tariffInflation, y - 1);
-    const batteryFade = r.batteryKwh > 0 && y > 12 ? 0.9 : 1;
-    cum += r.annualBenefit * degr * infl * batteryFade;
-    out.push({ year: y, cumulative: cum });
+    const degr = Math.pow(1 - LIFETIME.panelAgeing, y - 1);
+    const saving = p.billSaving * degr * Math.pow(1 + a.tariffInflation, y - 1);
+    const income = p.exportIncome * degr;
+    const tax = Math.max(0, income - p.exportTaxFree) * a.exportTaxRate;
+    const benefit = saving + income - tax;
+    const replacement =
+      (y === LIFETIME.inverterYear ? p.inverterCost * LIFETIME.inverterCostShare : 0) +
+      (y === LIFETIME.batteryYear ? p.batteryCost * LIFETIME.batteryCostShare : 0);
+    cum += benefit - replacement;
+    out.push({ year: y, cumulative: cum, benefit, replacement });
   }
   return out;
+}
+
+/** Years until the running total first reaches zero, with the fraction of the final year. Infinity when it never does. */
+export function paybackFrom(flow: Cashflow[]): number {
+  for (let i = 1; i < flow.length; i++) {
+    if (flow[i].cumulative >= 0) {
+      const prev = flow[i - 1].cumulative;
+      return i - 1 + -prev / (flow[i].cumulative - prev);
+    }
+  }
+  return Infinity;
+}
+
+export function cashflow(r: Result, a: Assumptions, years = LIFETIME.years): Cashflow[] {
+  return project({ billSaving: r.billSaving, exportIncome: r.exportIncome, exportTaxFree: r.exportTaxFree, netCost: r.netCost, inverterCost: r.inverterCost, batteryCost: r.batteryCost }, a, years);
+}
+
+export interface RangeCase { key: 'cautious' | 'expected' | 'optimistic'; label: string; note: string; netCost: number; yearly: number; payback: number; netGain: number }
+
+/**
+ * The same plan under a cautious, an expected and an optimistic outlook. Cautious: dearer install, 10% less output,
+ * no electricity price rises. Optimistic: cheaper install, 5% more output, 4% price rises a year.
+ */
+export function paybackRange(r: Result, a: Assumptions): RangeCase[] {
+  const grants = r.grant + r.batteryGrant;
+  const run = (key: RangeCase['key'], label: string, note: string, gross: number, output: number, inflation: number): RangeCase => {
+    const netCost = Math.max(0, gross - grants);
+    const flow = project({
+      billSaving: r.billSaving * output, exportIncome: r.exportIncome * output, exportTaxFree: r.exportTaxFree,
+      netCost, inverterCost: r.inverterCost, batteryCost: r.batteryCost,
+    }, { ...a, tariffInflation: inflation });
+    return { key, label, note, netCost, yearly: flow[1].benefit, payback: paybackFrom(flow), netGain: flow[flow.length - 1].cumulative };
+  };
+  return [
+    run('cautious', 'Cautious', 'Dearer quote, 10% less output, no price rises', r.grossHigh, 0.9, 0),
+    run('expected', 'Expected', 'Typical quote and output, your price rise assumption', r.grossCost, 1, a.tariffInflation),
+    run('optimistic', 'Optimistic', 'Cheaper quote, 5% more output, 4% price rises', r.grossLow, 1.05, 0.04),
+  ];
+}
+
+export interface Loan { monthly: number; total: number; interest: number }
+
+/** Monthly repayment on a standard amortising loan. A zero rate just spreads the amount evenly. */
+export function loanPayment(principal: number, annualRatePct: number, years: number): Loan {
+  const n = Math.max(1, Math.round(years * 12));
+  const i = annualRatePct / 100 / 12;
+  const monthly = principal <= 0 ? 0 : i === 0 ? principal / n : (principal * i) / (1 - Math.pow(1 + i, -n));
+  const total = monthly * n;
+  return { monthly, total, interest: Math.max(0, total - Math.max(0, principal)) };
 }
 
 /** Average unit rate across a typical home's use, weighted by when the power is used. */

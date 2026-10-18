@@ -15,7 +15,7 @@
     <section class="main">
 
       <!-- STEP 1 -->
-      @if (step() === 0) {
+      @if (step() === 1) {
         <h1>Your home</h1>
         <p class="sub">Your answers stay in your browser and are not sent to us.</p>
 
@@ -70,11 +70,11 @@
             <div class="q">
               <span class="ql" id="ori">Faces</span>
               <div class="qc">
-                <div class="seg" role="group" aria-labelledby="ori" [class.off]="s.home().roofType === 'flat'">
-                  <button type="button" [attr.aria-pressed]="s.home().orientation === 'S'" (click)="setOri('S')">South</button>
-                  <button type="button" [attr.aria-pressed]="s.home().orientation === 'SE_SW'" (click)="setOri('SE_SW')">SE or SW</button>
-                  <button type="button" [attr.aria-pressed]="s.home().orientation === 'E_W'" (click)="setOri('E_W')">East or west</button>
-                  <button type="button" [attr.aria-pressed]="s.home().orientation === 'N'" (click)="setOri('N')">North</button>
+                <div class="seg" role="group" aria-labelledby="ori">
+                  <button type="button" [attr.aria-pressed]="s.home().orientation === 'S'" [disabled]="s.home().roofType === 'flat'" (click)="setOri('S')">South</button>
+                  <button type="button" [attr.aria-pressed]="s.home().orientation === 'SE_SW'" [disabled]="s.home().roofType === 'flat'" (click)="setOri('SE_SW')">SE or SW</button>
+                  <button type="button" [attr.aria-pressed]="s.home().orientation === 'E_W'" [disabled]="s.home().roofType === 'flat'" (click)="setOri('E_W')">East or west</button>
+                  <button type="button" [attr.aria-pressed]="s.home().orientation === 'N'" [disabled]="s.home().roofType === 'flat'" (click)="setOri('N')">North</button>
                 </div>
                 <p class="hint">{{ s.home().roofType === 'flat' ? 'Not used for flat roofs. We assume panels on frames tilted south.' : oriHints[s.home().orientation] }}</p>
               </div>
@@ -135,21 +135,14 @@
           <h2>The household</h2>
           <div class="qs">
             <div class="q">
-              <span class="ql" id="occ">Who is home</span>
-              <div class="qc">
-                <div class="seg" role="group" aria-labelledby="occ">
-                  <button type="button" [attr.aria-pressed]="s.home().occupancy === 'away'" (click)="setOcc('away')">Out all day</button>
-                  <button type="button" [attr.aria-pressed]="s.home().occupancy === 'mixed'" (click)="setOcc('mixed')">Part of the day</button>
-                  <button type="button" [attr.aria-pressed]="s.home().occupancy === 'home'" (click)="setOcc('home')">Most days</button>
-                </div>
-                <p class="hint">{{ occHints[s.home().occupancy] }}</p>
-              </div>
-            </div>
-            <div class="q">
               <span class="ql">Planning to add</span>
-              <div class="qc inline">
-                <label class="check"><input type="checkbox" [checked]="s.home().addEv" (change)="s.patchHome({ addEv: $any($event.target).checked })" /><span>Electric car <span class="muted small">+2,600 kWh a year</span></span></label>
-                <label class="check"><input type="checkbox" [checked]="s.home().addHeatPump" (change)="s.patchHome({ addHeatPump: $any($event.target).checked })" /><span>Heat pump <span class="muted small">+3,500 kWh a year</span></span></label>
+              <div class="qc">
+                <div class="inline">
+                  <label class="check"><input type="checkbox" [checked]="s.home().addEv" (change)="s.patchHome({ addEv: $any($event.target).checked })" /><span>Electric car <span class="muted small">+2,600 kWh a year</span></span></label>
+                  <label class="check"><input type="checkbox" [checked]="s.home().addHeatPump" (change)="s.patchHome({ addHeatPump: $any($event.target).checked })" /><span>Heat pump <span class="muted small">+3,500 kWh a year</span></span></label>
+                </div>
+                @if (s.noticed().nightLoad) { <p class="hint warn">Your meter data already shows heavy use overnight, as an electric car or night heating would. If you already have an electric car, leave "Electric car" unticked so it is not counted twice.</p> }
+                @if (s.noticed().winterHeavy) { <p class="hint warn">Your meter data already shows much more use in winter, as electric heating or a heat pump would. If you already have one, leave "Heat pump" unticked.</p> }
               </div>
             </div>
             <div class="q">
@@ -174,7 +167,7 @@
       }
 
       <!-- STEP 2 -->
-      @if (step() === 1) {
+      @if (step() === 0) {
         <h1>Your electricity use</h1>
         <p class="sub">Smart meter data is best because it shows when you use power, not just how much.</p>
 
@@ -184,6 +177,8 @@
           <button type="button" [attr.aria-pressed]="s.mode() === 'bill'" (click)="setMode('bill')">Monthly bill</button>
         </div>
 
+        <p class="hint modehelp">Not sure? A monthly bill takes ten seconds. ESB meter data is the most accurate.</p>
+
         <div class="source">
           @if (s.mode() === 'meter') {
             <div class="drop">
@@ -192,7 +187,7 @@
               @if (fileName()) { <span class="small">{{ fileName() }}</span> <button class="btn ghost sm" type="button" (click)="clearFile()">Remove</button> }
             </div>
             <p class="hint">Read in your browser and never uploaded. <a routerLink="/guide/esb-data">How to get the file from ESB Networks</a>.</p>
-            @if (fileError()) { <p class="err" role="alert">{{ fileError() }}</p> }
+            @if (fileError()) { <p class="err" role="alert"><i class="ph ph-warning-circle" aria-hidden="true"></i><span>{{ fileError() }} Try the "30-minute readings in kWh" file from your ESB Networks account, or use your yearly kWh instead.</span></p> }
             @if (s.meterUsage(); as m) { <p class="hint ok">{{ m.coverage }}</p> }
           }
           @if (s.mode() === 'annual') {
@@ -207,6 +202,29 @@
             <p class="hint warn">Without meter data we guess when you use power from your answers. Solar savings depend on that, so treat results as a range.</p>
           }
         </div>
+
+        @if (notes().length) {
+          <section class="noticed" aria-labelledby="noticed">
+            <h2 id="noticed">What we noticed in your data</h2>
+            <ul>@for (n of notes(); track n.text) { <li [class.warn]="n.warn">{{ n.text }}</li> }</ul>
+          </section>
+        }
+
+        @if (!s.hourlyMeter()) {
+          <div class="qs occupancy">
+            <div class="q">
+              <span class="ql" id="occ">Who is home</span>
+              <div class="qc">
+                <div class="seg" role="group" aria-labelledby="occ">
+                  <button type="button" [attr.aria-pressed]="s.home().occupancy === 'away'" (click)="setOcc('away')">Out all day</button>
+                  <button type="button" [attr.aria-pressed]="s.home().occupancy === 'mixed'" (click)="setOcc('mixed')">Part of the day</button>
+                  <button type="button" [attr.aria-pressed]="s.home().occupancy === 'home'" (click)="setOcc('home')">Most days</button>
+                </div>
+                <p class="hint">{{ occHints[s.home().occupancy] }} We use this to estimate when you use power{{ bandsOnly() ? ' inside each rate band' : '' }}.</p>
+              </div>
+            </div>
+          </div>
+        }
 
         <details class="disc rates">
           <summary><span>Your rates</span><span class="muted">{{ ratesSummary() }}</span></summary>
@@ -288,13 +306,13 @@
         <div class="opts" role="radiogroup" aria-label="Starting point">
           <div class="opts-head" aria-hidden="true"><span>Option</span><span>System</span><span class="r">You pay after grants</span><span class="r">Payback</span><span class="r">Covers</span></div>
           @for (x of s.strategies(); track x.key) {
-            <button type="button" role="radio" class="opt-row" [attr.aria-checked]="isPicked(x)" (click)="pickStrategy(x)">
+            <button type="button" role="radio" class="opt-row" [class.rec]="x.key === 'best'" [attr.aria-checked]="isPicked(x)" (click)="pickStrategy(x)">
               <span class="nm">
                 <span class="radio" aria-hidden="true"></span>
-                <span class="t"><b>{{ x.label }}</b>@if (x.key === 'best') { <em>Recommended</em> }<span class="small muted">{{ x.blurb }}</span></span>
+                <span class="t"><b>{{ x.label }}</b>@if (x.key === 'best') { <span class="chip">Recommended</span> }<span class="small muted">{{ x.blurb }}</span></span>
               </span>
               <span class="sy num">{{ x.kwp | number: '1.1-1' }} kWp<span class="small muted">{{ x.panels }} panels{{ x.batteryKwh ? ', ' + x.batteryKwh + ' kWh battery' : ', no battery' }}</span></span>
-              <span class="r num" data-l="You pay">{{ eur0(x.netCost) }}<span class="small muted">{{ x.grant + x.batteryGrant ? eur0(x.grossCost) + ' less ' + eur0(x.grant + x.batteryGrant) + ' grants' : eur0(x.grossCost) + ', no grants' }}</span></span>
+              <span class="r num pay" data-l="You pay"><b>{{ eur0(x.netCost) }}</b><span class="small muted">{{ x.grant + x.batteryGrant ? eur0(x.grossCost) + ' less ' + eur0(x.grant + x.batteryGrant) : eur0(x.grossCost) + ', no grants' }}</span></span>
               <span class="r num" data-l="Payback">{{ payback(x.paybackYears) }}</span>
               <span class="r num" data-l="Covers">{{ pc(x.selfSufficiency) }}</span>
             </button>
@@ -315,18 +333,27 @@
               </div>
             </div>
             <div class="q">
-              <span class="ql" id="bat">Battery size</span>
+              <span class="ql" id="bat">Battery</span>
               <div class="qc">
                 <div class="seg" role="group" aria-labelledby="bat">
-                  @for (b of batteryOptions; track b) { <button type="button" [attr.aria-pressed]="cfg().batteryKwh === b" (click)="setBattery(b)">{{ b === 0 ? 'None' : b + ' kWh' }}</button> }
+                  <button type="button" [attr.aria-pressed]="!hasBattery()" (click)="setHasBattery(false)">No battery</button>
+                  <button type="button" [attr.aria-pressed]="hasBattery()" (click)="setHasBattery(true)">Add a battery</button>
                 </div>
-                <p class="hint">The sizes Irish installers usually fit.</p>
+                @if (hasBattery()) {
+                  <div class="seg sizes" role="group" aria-label="Battery size">
+                    @for (b of batterySizes; track b) { <button type="button" [attr.aria-pressed]="cfg().batteryKwh === b" (click)="setBattery(b)">{{ b }} kWh</button> }
+                  </div>
+                  <p class="hint">The sizes Irish installers usually fit.</p>
+                } @else {
+                  <p class="hint">Solar panels alone usually pay back faster. A battery makes sense if you use most of your power in the evening and at night.</p>
+                }
               </div>
             </div>
+            @if (hasBattery()) {
             <div class="q">
               <span class="ql" id="tier">Battery type</span>
               <div class="qc">
-                <div class="seg" role="group" aria-labelledby="tier" [class.off]="cfg().batteryKwh === 0">
+                <div class="seg" role="group" aria-labelledby="tier">
                   @for (t of tiers; track t.key) { <button type="button" [attr.aria-pressed]="s.assumptions().batteryTier === t.key" (click)="setTier(t.key)">{{ t.label }}</button> }
                 </div>
                 <p class="hint">{{ tierLine() }}</p>
@@ -351,6 +378,7 @@
                 </details>
               </div>
             </div>
+            }
           </div>
         </section>
 
@@ -378,17 +406,21 @@
 
       <!-- STEP 4 -->
       @if (step() === 3) {
-        <h1>Cost and return</h1>
-        <p class="answer">{{ r().panels }} panels ({{ r().kwp | number: '1.1-1' }} kWp){{ r().batteryKwh ? ' with a ' + r().batteryKwh + ' kWh battery' : ' and no battery' }}. You would pay about <strong class="num">{{ eur0(r().netCost) }}</strong> after grants, get about <strong class="num">{{ eur0(r().annualBenefit) }}</strong> a year back, and break even in <strong class="num">{{ payback(r().paybackYears) }}</strong>.</p>
+        <h1>Your solar plan</h1>
+        <p class="answer">{{ r().panels }} panels ({{ r().kwp | number: '1.1-1' }} kWp){{ r().batteryKwh ? ' with a ' + r().batteryKwh + ' kWh battery' : ', no battery' }}. You would pay about <strong class="num">{{ eur0(r().netCost) }}</strong> after grants, get about <strong class="num">{{ eur0(r().annualBenefit) }}</strong> a year back, and break even in <strong class="num">{{ payback(r().paybackYears) }}</strong>.</p>
         <p class="calc num">{{ eur0(r().grossCost) }} installed@if (r().grant) { - {{ eur0(r().grant) }} SEAI solar grant }@if (r().batteryGrant) { - {{ eur0(r().batteryGrant) }} SEAI battery grant } = <b>{{ eur0(r().netCost) }}</b> you pay @if (!r().grant && !r().batteryGrant) { <span class="muted">(no SEAI grants applied, see SEAI grants below)</span> }</p>
-        <p class="hint">Typical installed range before grants: {{ eur0(r().grossLow) }} to {{ eur0(r().grossHigh) }}. The yearly benefit is {{ eur0(r().billSaving) }} off your bill plus {{ eur0(r().exportIncome - r().exportTax) }} from exports{{ r().exportTax ? ' after tax' : ', tax-free' }}.</p>
 
+        <div class="next no-print">
+          <a class="btn primary" routerLink="/quote">Find installers to quote</a>
+          <button class="btn" type="button" (click)="print()">Save as PDF</button>
+        </div>
+        <p class="hint">Typical installed range before grants: {{ eur0(r().grossLow) }} to {{ eur0(r().grossHigh) }}. The yearly benefit is {{ eur0(r().billSaving) }} off your bill plus {{ eur0(r().exportIncome - r().exportTax) }} from exports{{ r().exportTax ? ' after tax' : ', tax-free' }}.</p>
         <estimate-note />
 
         <section class="grp">
           <div class="two">
             <figure>
-              <figcaption><b>25 years</b><span class="muted small">Cumulative position, with 0.5% yearly panel ageing and {{ pc(s.assumptions().tariffInflation) }} yearly price rises. Break-even around year {{ s.flow().find(f => f.cumulative >= 0)?.year ?? '25+' }}.</span></figcaption>
+              <figcaption><b>25 years</b><span class="muted small">Cumulative position after cost, grants and tax. Panels lose 0.5% a year and your bill saving rises {{ pc(s.assumptions().tariffInflation) }} a year with prices. Export income is held flat. The inverter is replaced in year 13{{ r().batteryKwh ? ' and the battery in year 15' : '' }}. Break-even around year {{ s.flow().find(f => f.cumulative >= 0)?.year ?? '25+' }}, and about {{ eur0(r().netGain) }} ahead after 25 years.</span></figcaption>
               <cash-chart [points]="s.flow()" />
             </figure>
             <div>
@@ -407,99 +439,182 @@
         </section>
 
         <section class="grp">
-          <h2>Where the money goes</h2>
-          <p class="hint tight">Typical installed prices for a system this size. Ranges run from cheaper to pricier installers, and your quotes will vary. VAT on solar is 0%.</p>
-          <div class="tablewrap">
-            <table class="tbl costs">
-              <thead><tr><th>Item</th><th class="r">Typical</th><th class="r">Range</th></tr></thead>
-              <tbody>
-                @for (row of r().breakdown; track row.key) {
-                  <tr><td><b>{{ row.label }}</b><span class="small muted">{{ row.note }}</span></td><td class="r num">{{ eur(row.mid) }}</td><td class="r num">{{ eur(row.low) }} to {{ eur(row.high) }}</td></tr>
-                }
-              </tbody>
-              <tfoot>
-                <tr><td>Installed total</td><td class="r num">{{ eur(r().grossCost) }}</td><td class="r num">{{ eur(r().grossLow) }} to {{ eur(r().grossHigh) }}</td></tr>
-                <tr><td>Less SEAI solar grant</td><td class="r num">{{ r().grant ? '-' + eur(r().grant) : 'Not applied' }}</td><td></td></tr>
-                @if (r().batteryGrant) { <tr><td>Less SEAI battery grant</td><td class="r num">-{{ eur(r().batteryGrant) }}</td><td></td></tr> }
-                <tr class="tot"><td>You pay</td><td class="r num">{{ eur(r().netCost) }}</td><td class="r num">{{ eur(max0(r().grossLow - r().grant - r().batteryGrant)) }} to {{ eur(max0(r().grossHigh - r().grant - r().batteryGrant)) }}</td></tr>
-              </tfoot>
-            </table>
-          </div>
-          @if (r().exportIncome > 0) {
-            @if (r().exportTax > 0) {
-              <p class="hint warn">Your export income of about {{ eur0(r().exportIncome) }} a year is above the tax-free allowance of {{ eur0(r().exportTaxFree) }} ({{ s.home().taxpayers }} {{ s.home().taxpayers === 1 ? 'person' : 'people' }} x {{ eur0(s.assumptions().exportTaxFreePerPerson) }}). The excess is taxed at about {{ pc(s.assumptions().exportTaxRate) }}, which costs about {{ eur0(r().exportTax) }} a year. That is already taken off the figures above.</p>
-            } @else {
-              <p class="hint">Your export income of about {{ eur0(r().exportIncome) }} a year is within the tax-free allowance of {{ eur0(r().exportTaxFree) }}, so no tax is taken off.</p>
+          <h2>With or without a battery</h2>
+          <p class="hint">The same {{ r().panels }} panels, with and without storage. "Extra over panels only" is what the battery adds to your 25 year position after its own cost, grant and replacement.</p>
+          <div class="cmp">
+            <div class="cmp-head" aria-hidden="true"><span>Option</span><span class="r">You pay after grants</span><span class="r">Yearly benefit</span><span class="r">Payback</span><span class="r">25 year gain</span><span class="r">Extra over panels only</span></div>
+            @for (c of compare(); track c.kwh) {
+              <div class="cmp-row" [class.cur]="c.current">
+                <span class="nm"><b>{{ c.kwh ? c.kwh + ' kWh battery' : 'Panels only' }}</b>@if (c.current) { <span class="chip">Your choice</span> }</span>
+                <span class="r num" data-l="You pay">{{ eur0(c.r.netCost) }}</span>
+                <span class="r num" data-l="Yearly benefit">{{ eur0(c.r.annualBenefit) }}</span>
+                <span class="r num" data-l="Payback">{{ payback(c.r.paybackYears) }}</span>
+                <span class="r num" data-l="25 year gain">{{ eur0(c.r.netGain) }}</span>
+                <span class="r num" data-l="Extra over panels only">@if (c.kwh) { {{ c.extraGain >= 0 ? '+' : '-' }}{{ eur0(abs(c.extraGain)) }} } @else { <span class="muted">-</span> }</span>
+              </div>
             }
-          }
+          </div>
         </section>
 
         <section class="grp">
-          <h2>SEAI grants</h2>
-          <div class="tablewrap">
-            <table class="tbl grants">
-              <thead><tr><th>Grant</th><th>For your plan</th><th class="r">Amount</th></tr></thead>
-              <tbody>
-                <tr>
-                  <td><b>Solar PV grant</b><span class="small muted">€{{ grantsCfg.seaiSolarFirst2kwpPerKwp }} per kWp for the first 2 kWp, €{{ grantsCfg.seaiSolarNext2kwpPerKwp }} per kWp up to 4 kWp, maximum €{{ grantsCfg.seaiSolarMax | number }}.</span></td>
-                  <td>{{ grantRows().solar.text }}</td>
-                  <td class="r num">{{ grantRows().solar.amount }}</td>
-                </tr>
-                <tr>
-                  <td><b>Battery grant</b><span class="small muted">€{{ grantsCfg.seaiBattery }} for a battery of {{ grantsCfg.seaiBatteryMinKwh }} kWh or more, opened {{ batteryOpened }}.</span></td>
-                  <td>{{ grantRows().battery.text }}</td>
-                  <td class="r num">{{ grantRows().battery.amount }}</td>
-                </tr>
-              </tbody>
-            </table>
+          <h2>How sure is this?</h2>
+          <p class="hint">Nobody knows future prices or weather, so here is the same plan under three outlooks.</p>
+          <div class="cmp rng">
+            <div class="cmp-head" aria-hidden="true"><span>Outlook</span><span class="r">You pay after grants</span><span class="r">First year benefit</span><span class="r">Payback</span><span class="r">25 year gain</span></div>
+            @for (c of range(); track c.key) {
+              <div class="cmp-row" [class.cur]="c.key === 'expected'">
+                <span class="nm"><b>{{ c.label }}</b><span class="small muted">{{ c.note }}</span></span>
+                <span class="r num" data-l="You pay">{{ eur0(c.netCost) }}</span>
+                <span class="r num" data-l="First year benefit">{{ eur0(c.yearly) }}</span>
+                <span class="r num" data-l="Payback">{{ payback(c.payback) }}</span>
+                <span class="r num" data-l="25 year gain">{{ eur0(c.netGain) }}</span>
+              </div>
+            }
           </div>
-          <p class="hint">You also need to: own the home, have an <a routerLink="/glossary" fragment="mprn">MPRN</a>, have had no earlier SEAI funding at that MPRN, use an SEAI-registered installer, and receive your grant offer <b>before</b> any work starts. You then have 8 months to finish. A BER assessment is needed before payment.</p>
-          <ul class="links">
-            <li><a [href]="links.solarGrant" target="_blank" rel="noopener noreferrer">SEAI: solar electricity grant</a></li>
-            <li><a [href]="links.batteryGrant" target="_blank" rel="noopener noreferrer">SEAI: battery grant</a></li>
-            <li><a [href]="links.howToApply" target="_blank" rel="noopener noreferrer">SEAI: how to apply</a></li>
-            <li><a [href]="links.installers" target="_blank" rel="noopener noreferrer">SEAI: registered solar installers</a></li>
-            <li><a [href]="links.enhanced" target="_blank" rel="noopener noreferrer">SEAI: enhanced grants, up to €{{ grantsCfg.seaiEnhancedMax | number }} for some welfare recipients</a></li>
-          </ul>
-          <p class="hint">Grant rules change. Always check the SEAI pages above before you apply.</p>
         </section>
 
-        <details class="more checklist">
-          <summary>What to confirm with each installer</summary>
-          <ul>@for (i of checklist; track i) { <li>{{ i }}</li> }</ul>
-        </details>
-
-        <details class="disc">
-          <summary><span>Assumptions</span><span class="muted">Prices, grants, price rises</span></summary>
-          <div class="body">
-            <div class="rates-grid">
-              <div class="field"><label for="a4">Yearly energy price rise (%)</label><input id="a4" type="number" step="0.5" [value]="s.assumptions().tariffInflation * 100" (input)="setAssump('tariffInflation', pct($event))" /></div>
-              <div class="field"><label for="a5">Installed cost base (€)</label><input id="a5" type="number" step="100" [value]="s.assumptions().panelCostBase" (input)="setAssump('panelCostBase', num($event))" /></div>
-              <div class="field"><label for="a6">Installed cost per kWp (€)</label><input id="a6" type="number" step="50" [value]="s.assumptions().panelCostPerKwp" (input)="setAssump('panelCostPerKwp', num($event))" /></div>
-              <div class="field"><label for="a8">Tax-free export income per person (€ a year)</label><input id="a8" type="number" step="50" [value]="s.assumptions().exportTaxFreePerPerson" (change)="setAssump('exportTaxFreePerPerson', num($event))" /></div>
-              <div class="field"><label for="a9">Tax rate above the allowance (%)</label><input id="a9" type="number" step="1" [value]="s.assumptions().exportTaxRate * 100" (change)="setAssump('exportTaxRate', pct($event))" /></div>
+        <section class="grp">
+          <h2>Selling your exports</h2>
+          <p class="hint">Surplus power goes to the grid and your supplier pays for it. Export income is tax-free up to an allowance for each person on the bill. Above that, tax is due.</p>
+          <div class="exp-controls">
+            <div class="field"><label for="x-rate">Export rate (c/kWh)</label><input id="x-rate" type="number" min="0" step="0.1" [value]="cents('exportRate')" (change)="setCents('exportRate', $event)" /></div>
+            <div class="field"><span class="lbl" id="x-ppl">People on the bill</span>
+              <div class="seg" role="group" aria-labelledby="x-ppl">
+                <button type="button" [attr.aria-pressed]="s.home().taxpayers === 1" (click)="setPayers(1)">One</button>
+                <button type="button" [attr.aria-pressed]="s.home().taxpayers === 2" (click)="setPayers(2)">Two</button>
+              </div>
             </div>
-            <p class="hint">€400 a person is the limit in force. Budget 2027 announced €600, with the start date still to be set, and we use €600. The rate is about 28% at the standard rate including USC and PRSI, and about 48% at the higher rate. Check Revenue's current rules.</p>
-            <label class="check"><input type="checkbox" [checked]="s.assumptions().seaiGrant" (change)="setAssump('seaiGrant', $any($event.target).checked)" /><span>Count the SEAI solar grant <span class="muted small">Applied when your home qualifies on age. See SEAI grants above.</span></span></label>
-            <label class="check"><input type="checkbox" [checked]="s.assumptions().seaiBatteryGrant" (change)="setAssump('seaiBatteryGrant', $any($event.target).checked)" /><span>Count the SEAI battery grant <span class="muted small">Applied for a battery of 5 kWh or more when your home qualifies on age.</span></span></label>
-            <p class="hint">Unit rates and the export rate are on <button class="linklike" type="button" (click)="go(1)">step 2</button>.</p>
+            <div class="field"><span class="lbl" id="x-tax">Tax rate above allowance</span>
+              <div class="seg" role="group" aria-labelledby="x-tax">
+                @for (t of taxRates; track t.rate) {
+                  <button type="button" [attr.aria-pressed]="s.assumptions().exportTaxRate === t.rate" (click)="setAssump('exportTaxRate', t.rate)">{{ t.label }}</button>
+                }
+              </div>
+            </div>
           </div>
-        </details>
+          <div class="cmp exp">
+            <div class="cmp-head" aria-hidden="true"><span>Per year</span><span class="r">One person</span><span class="r">Two people</span></div>
+            <div class="cmp-row"><span class="nm"><b>Export income</b><span class="small muted">{{ r().exportKwh | number: '1.0-0' }} kWh at {{ cents('exportRate') }}c</span></span><span class="r num" data-l="One person">{{ eur0(r().exportIncome) }}</span><span class="r num" data-l="Two people">{{ eur0(r().exportIncome) }}</span></div>
+            <div class="cmp-row"><span class="nm"><b>Tax-free allowance</b></span>@for (x of exportView(); track x.people) { <span class="r num" [attr.data-l]="x.people === 1 ? 'One person' : 'Two people'">{{ eur0(x.allowance) }}</span> }</div>
+            <div class="cmp-row"><span class="nm"><b>Taxed at {{ pc(s.assumptions().exportTaxRate) }}</b></span>@for (x of exportView(); track x.people) { <span class="r num" [attr.data-l]="x.people === 1 ? 'One person' : 'Two people'">{{ x.tax ? '-' + eur0(x.tax) : 'None' }}</span> }</div>
+            <div class="cmp-row cur"><span class="nm"><b>You keep</b></span>@for (x of exportView(); track x.people) { <span class="r num" [attr.data-l]="x.people === 1 ? 'One person' : 'Two people'"><b>{{ eur0(x.kept) }}</b></span> }</div>
+          </div>
+          <p class="hint">Two people on the bill keep {{ eur0(exportView()[1].kept - exportView()[0].kept) }} more a year{{ exportView()[1].kept - exportView()[0].kept ? '' : ' (your export income is within one allowance, so it makes no difference)' }}. The allowance is {{ eur0(s.assumptions().exportTaxFreePerPerson) }} each as modelled. Check <a href="https://www.revenue.ie" target="_blank" rel="noopener noreferrer">Revenue</a> for the rules that apply to you.</p>
+        </section>
 
-        <div class="next no-print">
-          <a class="btn primary" routerLink="/quote">Find installers to quote</a>
-          <button class="btn" type="button" (click)="print()">Save as PDF</button>
-          <a class="linklike" routerLink="/reviews">Installer ratings</a>
+        <div class="discs">
+          <details class="disc">
+            <summary><span>If you pay by loan</span><span class="muted num">{{ eur0(loan().monthly) }} a month over {{ loanYears() }} years</span></summary>
+            <div class="body">
+              <p class="hint tight">Borrow the {{ eur0(r().netCost) }} you pay after grants. Many installers need the money before the grant is paid, so check how a loan would bridge that. The rate is a guess, so enter your lender's.</p>
+              <div class="exp-controls">
+                <div class="field"><label for="l-rate">Interest rate (% a year)</label><input id="l-rate" type="number" min="0" max="30" step="0.1" [value]="loanRate()" (change)="setLoanRate($event)" /></div>
+                <div class="field"><span class="lbl" id="l-term">Term</span>
+                  <div class="seg" role="group" aria-labelledby="l-term">
+                    @for (t of loanTerms; track t) { <button type="button" [attr.aria-pressed]="loanYears() === t" (click)="loanYears.set(t)">{{ t }} years</button> }
+                  </div>
+                </div>
+              </div>
+              <dl class="rows">
+                <div><dt>Monthly repayment</dt><dd class="num">{{ eur0(loan().monthly) }}</dd></div>
+                <div><dt>Average monthly benefit from solar</dt><dd class="num">{{ eur0(loan().monthlyBenefit) }}</dd></div>
+                <div><dt>{{ loan().net >= 0 ? 'Left in your pocket each month' : 'Extra you pay each month' }}</dt><dd class="num"><b>{{ eur0(abs(loan().net)) }}</b></dd></div>
+                <div><dt>Interest over the loan</dt><dd class="num">{{ eur0(loan().interest) }}</dd></div>
+              </dl>
+              <p class="hint">The benefit is the first year average. It arrives as lower bills and export payments, not as a monthly payment, so the real timing varies by season.</p>
+            </div>
+          </details>
+          <details class="disc">
+            <summary><span>Where the money goes</span><span class="muted num">{{ eur0(r().grossCost) }} installed, range {{ eur0(r().grossLow) }} to {{ eur0(r().grossHigh) }}</span></summary>
+            <div class="body">
+              <p class="hint tight">Typical installed prices for a system this size. Ranges run from cheaper to pricier installers, and your quotes will vary. VAT on solar is 0%.</p>
+              <div class="tablewrap">
+                <table class="tbl costs">
+                  <thead><tr><th>Item</th><th class="r">Typical</th><th class="r">Range</th></tr></thead>
+                  <tbody>
+                    @for (row of r().breakdown; track row.key) {
+                      <tr><td><b>{{ row.label }}</b><span class="small muted">{{ row.note }}</span></td><td class="r num">{{ eur(row.mid) }}</td><td class="r num">{{ eur(row.low) }} to {{ eur(row.high) }}</td></tr>
+                    }
+                  </tbody>
+                  <tfoot>
+                    <tr><td>Installed total</td><td class="r num">{{ eur(r().grossCost) }}</td><td class="r num">{{ eur(r().grossLow) }} to {{ eur(r().grossHigh) }}</td></tr>
+                    <tr><td>Less SEAI solar grant</td><td class="r num">{{ r().grant ? '-' + eur(r().grant) : 'Not applied' }}</td><td></td></tr>
+                    @if (r().batteryGrant) { <tr><td>Less SEAI battery grant</td><td class="r num">-{{ eur(r().batteryGrant) }}</td><td></td></tr> }
+                    <tr class="tot"><td>You pay</td><td class="r num">{{ eur(r().netCost) }}</td><td class="r num">{{ eur(max0(r().grossLow - r().grant - r().batteryGrant)) }} to {{ eur(max0(r().grossHigh - r().grant - r().batteryGrant)) }}</td></tr>
+                  </tfoot>
+                </table>
+              </div>
+              @if (r().exportIncome > 0) {
+                @if (r().exportTax > 0) {
+                  <p class="hint warn">Your export income of about {{ eur0(r().exportIncome) }} a year is above the tax-free allowance of {{ eur0(r().exportTaxFree) }} ({{ s.home().taxpayers }} {{ s.home().taxpayers === 1 ? 'person' : 'people' }} x {{ eur0(s.assumptions().exportTaxFreePerPerson) }}). The excess is taxed at about {{ pc(s.assumptions().exportTaxRate) }}, which costs about {{ eur0(r().exportTax) }} a year. That is already taken off the figures above.</p>
+                } @else {
+                  <p class="hint">Your export income of about {{ eur0(r().exportIncome) }} a year is within the tax-free allowance of {{ eur0(r().exportTaxFree) }}, so no tax is taken off.</p>
+                }
+              }
+            </div>
+          </details>
+
+          <details class="disc">
+            <summary><span>SEAI grants</span><span class="muted num">{{ r().grant + r().batteryGrant ? eur0(r().grant + r().batteryGrant) + ' counted' : 'None counted' }}</span></summary>
+            <div class="body">
+              <div class="tablewrap">
+                <table class="tbl grants">
+                  <thead><tr><th>Grant</th><th>For your plan</th><th class="r">Amount</th></tr></thead>
+                  <tbody>
+                    <tr>
+                      <td><b>Solar PV grant</b><span class="small muted">€{{ grantsCfg.seaiSolarFirst2kwpPerKwp }} per kWp for the first 2 kWp, €{{ grantsCfg.seaiSolarNext2kwpPerKwp }} per kWp up to 4 kWp, maximum €{{ grantsCfg.seaiSolarMax | number }}.</span></td>
+                      <td>{{ grantRows().solar.text }}</td>
+                      <td class="r num">{{ grantRows().solar.amount }}</td>
+                    </tr>
+                    <tr>
+                      <td><b>Battery grant</b><span class="small muted">€{{ grantsCfg.seaiBattery }} for a battery of {{ grantsCfg.seaiBatteryMinKwh }} kWh or more, opened {{ batteryOpened }}.</span></td>
+                      <td>{{ grantRows().battery.text }}</td>
+                      <td class="r num">{{ grantRows().battery.amount }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p class="hint">You also need to: own the home, have an <a routerLink="/glossary" fragment="mprn">MPRN</a>, have had no earlier SEAI funding at that MPRN, use an SEAI-registered installer, and receive your grant offer <b>before</b> any work starts. You then have 8 months to finish. A BER assessment is needed before payment.</p>
+              <ul class="links">
+                <li><a [href]="links.solarGrant" target="_blank" rel="noopener noreferrer">SEAI: solar electricity grant</a></li>
+                <li><a [href]="links.batteryGrant" target="_blank" rel="noopener noreferrer">SEAI: battery grant</a></li>
+                <li><a [href]="links.howToApply" target="_blank" rel="noopener noreferrer">SEAI: how to apply</a></li>
+                <li><a [href]="links.installers" target="_blank" rel="noopener noreferrer">SEAI: registered solar installers</a></li>
+                <li><a [href]="links.enhanced" target="_blank" rel="noopener noreferrer">SEAI: enhanced grants, up to €{{ grantsCfg.seaiEnhancedMax | number }} for some welfare recipients</a></li>
+              </ul>
+              <p class="hint">Grant rules change. Always check the SEAI pages above before you apply.</p>
+            </div>
+          </details>
+
+          <details class="disc">
+            <summary><span>What to confirm with each installer</span><span class="muted">{{ checklist.length }} questions</span></summary>
+            <div class="body"><ul class="checks">@for (i of checklist; track i) { <li>{{ i }}</li> }</ul></div>
+          </details>
+
+          <details class="disc">
+            <summary><span>Assumptions</span><span class="muted">Prices, grants, price rises</span></summary>
+            <div class="body">
+              <div class="rates-grid">
+                <div class="field"><label for="a4">Yearly energy price rise (%)</label><input id="a4" type="number" step="0.5" [value]="s.assumptions().tariffInflation * 100" (input)="setAssump('tariffInflation', pct($event))" /></div>
+                <div class="field"><label for="a5">Installed cost base (€)</label><input id="a5" type="number" step="100" [value]="s.assumptions().panelCostBase" (input)="setAssump('panelCostBase', num($event))" /></div>
+                <div class="field"><label for="a6">Installed cost per kWp (€)</label><input id="a6" type="number" step="50" [value]="s.assumptions().panelCostPerKwp" (input)="setAssump('panelCostPerKwp', num($event))" /></div>
+                <div class="field"><label for="a8">Tax-free export income per person (€ a year)</label><input id="a8" type="number" step="50" [value]="s.assumptions().exportTaxFreePerPerson" (change)="setAssump('exportTaxFreePerPerson', num($event))" /></div>
+                <div class="field"><label for="a9">Tax rate above the allowance (%)</label><input id="a9" type="number" step="1" [value]="s.assumptions().exportTaxRate * 100" (change)="setAssump('exportTaxRate', pct($event))" /></div>
+              </div>
+              <p class="hint">€400 a person is the limit in force. Budget 2027 announced €600, with the start date still to be set, and we use €600. The rate is about 28% at the standard rate including USC and PRSI, and about 48% at the higher rate. Check Revenue's current rules.</p>
+              <label class="check"><input type="checkbox" [checked]="s.assumptions().seaiGrant" (change)="setAssump('seaiGrant', $any($event.target).checked)" /><span>Count the SEAI solar grant <span class="muted small">Applied when your home qualifies on age. See SEAI grants above.</span></span></label>
+              <label class="check"><input type="checkbox" [checked]="s.assumptions().seaiBatteryGrant" (change)="setAssump('seaiBatteryGrant', $any($event.target).checked)" /><span>Count the SEAI battery grant <span class="muted small">Applied for a battery of 5 kWh or more when your home qualifies on age.</span></span></label>
+              <p class="hint">Unit rates and the export rate are on <button class="linklike" type="button" (click)="go(0)">the Usage step</button>.</p>
+            </div>
+          </details>
         </div>
+
         <p class="print-only small">Estimate prepared with GreenWattz on {{ today }}. Not a quotation. Prices reviewed {{ priceDate }}. Confirm with SEAI-registered installers.</p>
-        <p class="small muted">These are modelled estimates using a typical day for each month, not a quotation. Actual results vary with weather, installation, tariff changes and how you use power.</p>
+        <p class="small muted fine">These are modelled estimates using a typical day for each month, not a quotation. Actual results vary with weather, installation, tariff changes and how you use power. <a routerLink="/reviews">Installer ratings</a>.</p>
       }
 
-      <div class="sum-inline no-print">
-        <span class="num">{{ cfg().panels }} panels{{ cfg().batteryKwh ? ', ' + cfg().batteryKwh + ' kWh' : '' }}</span><span class="num">{{ eur0(r().netCost) }}</span><span class="num">{{ payback(r().paybackYears) }}</span>
-      </div>
       <div class="nav-btns no-print">
-        <button class="btn" type="button" [disabled]="step() === 0" (click)="go(step() - 1)">Back</button>
+        @if (step() > 0) { <button class="btn" type="button" (click)="go(step() - 1)">Back</button> } @else { <span></span> }
         @if (step() < 3) { <button class="btn primary" type="button" (click)="go(step() + 1)">Continue</button> }
       </div>
     </section>
@@ -518,4 +633,10 @@
       <p class="small muted">Calculated in your browser. Not sent to us or stored.</p>
     </aside>
   </div>
+</div>
+
+<div class="mbar no-print" role="region" aria-label="Your plan so far">
+  @if (step() > 0) { <button class="btn ghost sm" type="button" (click)="go(step() - 1)">Back</button> }
+  <span class="mb-sum num"><b>{{ eur0(r().netCost) }}</b><span class="muted">{{ payback(r().paybackYears) }}</span></span>
+  @if (step() < 3) { <button class="btn primary sm" type="button" (click)="go(step() + 1)">Continue</button> } @else { <a class="btn primary sm" routerLink="/quote">Get quotes</a> }
 </div>

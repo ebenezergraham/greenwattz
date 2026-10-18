@@ -3,7 +3,7 @@ import {
   PRICES, priceAgeDays, pricesAreStale,
   Eligibility, grantEligibility,
   Assumptions, BATTERY_OPTIONS, BATTERY_SIZES, BATTERY_TIERS, BatteryTier, batteryPrice, batteryTierInfo, BandMonthly, bandHours, medianFromBands, profileFromBands, Band, Tariff, bandBreakdown, bandOf, bandsOfDay, blendedRate, dayStats, rateFor, BEST_MAX_GEN_RATIO, CONNECTION_LIMIT_KW, HOUSE_TYPES, ROOF_TYPES, STOREY_ACCESS, roofTypeInfo, DEFAULT_ASSUMPTIONS as A, HomeInputs, MONTH_DAYS, NO_OBSTACLES, Usage,
-  annualFromBill, annualFromProfile, averageDay, buildGrid, cashflow, connectionLimitPanels, costBreakdown, estimateProfile,
+  annualFromBill, annualFromProfile, averageDay, buildGrid, cashflow, loanPayment, paybackRange, exportTaxFor, EXPORT_TAX_RATES, LIFETIME, paybackFrom, project, connectionLimitPanels, costBreakdown, estimateProfile,
   maxPanels, obstacleArea, orientationFactor, pickStrategies, roofFitPanels, seaiGrantFor, shadingFactor, simulate, solarDay,
   splitUsage, systemCost, usableArea, withExtras,
 } from './engine';
@@ -176,7 +176,7 @@ describe('simulate: energy and money add up', () => {
     expect(r.annualBenefit).toBeCloseTo(r.billSaving + r.exportIncome - r.exportTax, 6);
     expect(r.exportIncome).toBeCloseTo(r.exportKwh * A.exportRate, 6);
     expect(r.netCost).toBe(r.grossCost - r.grant - r.batteryGrant);
-    if (r.annualBenefit > 0) expect(r.paybackYears).toBeCloseTo(r.netCost / r.annualBenefit, 9);
+    if (r.annualBenefit > 0) expect(r.paybackYears).toBeGreaterThanOrEqual(r.netCost / r.annualBenefit / 1.5);
   });
 
   it('generates kWp x yield x orientation x shading over a year', () => {
@@ -317,23 +317,44 @@ describe('25 year cash flow', () => {
   it('starts at minus the net cost', () => expect(flow[0].cumulative).toBeCloseTo(-r.netCost, 9));
   it('has 26 points, year 0 to 25', () => { expect(flow.length).toBe(26); expect(flow[25].year).toBe(25); });
   it('adds one year of benefit in year 1', () => expect(flow[1].cumulative).toBeCloseTo(-r.netCost + r.annualBenefit, 9));
-  it('ages panels 0.5% a year and raises prices by the assumed inflation', () => {
-    const y2 = flow[2].cumulative - flow[1].cumulative;
-    expect(y2).toBeCloseTo(r.annualBenefit * 0.995 * (1 + A.tariffInflation), 6);
+  it('ages panels, raises the bill saving with prices and holds export income flat', () => {
+    const y2 = flow[2].benefit;
+    const saving = r.billSaving * 0.995 * (1 + A.tariffInflation);
+    const income = r.exportIncome * 0.995;
+    const tax = Math.max(0, income - r.exportTaxFree) * A.exportTaxRate;
+    expect(y2).toBeCloseTo(saving + income - tax, 6);
   });
-  it('breaks even and keeps rising', () => {
+  it('breaks even, and payback comes from the same projection', () => {
     const be = flow.find((p) => p.cumulative >= 0);
     expect(be).toBeDefined();
-    expect(be!.year).toBeGreaterThan(0);
-    for (let i = 1; i < flow.length; i++) expect(flow[i].cumulative).toBeGreaterThan(flow[i - 1].cumulative);
+    expect(Math.ceil(r.paybackYears)).toBe(be!.year);
+    expect(r.netGain).toBeCloseTo(flow[25].cumulative, 9);
   });
-  it('fades a battery after 12 years', () => {
+  it('replaces the inverter in year 13 at a lower price', () => {
+    expect(flow[13].replacement).toBeCloseTo(r.inverterCost * LIFETIME.inverterCostShare, 9);
+    expect(flow[12].replacement).toBe(0);
+    expect(r.inverterCost).toBeGreaterThan(0);
+  });
+  it('replaces a battery in year 15 and not without one', () => {
     const b = simulate(usage(), home(), A, { panels: 10, batteryKwh: 10 });
     const f = cashflow(b, A);
-    const step = (y: number) => f[y].cumulative - f[y - 1].cumulative;
-    const infl = (y: number) => Math.pow(1 + A.tariffInflation, y - 1) * Math.pow(0.995, y - 1);
-    expect(step(12)).toBeCloseTo(b.annualBenefit * infl(12), 6);
-    expect(step(13)).toBeCloseTo(b.annualBenefit * infl(13) * 0.9, 6);
+    expect(b.batteryCost).toBeGreaterThan(0);
+    expect(f[15].replacement).toBeCloseTo(b.batteryCost * LIFETIME.batteryCostShare + 0, 6);
+    expect(flow[15].replacement).toBe(0);
+  });
+  it('has infinite payback when savings never repay the cost', () => {
+    const f = project({ billSaving: 10, exportIncome: 0, exportTaxFree: 0, netCost: 5000, inverterCost: 0, batteryCost: 0 }, A);
+    expect(paybackFrom(f)).toBe(Infinity);
+  });
+  it('interpolates inside the year it breaks even', () => {
+    const f = project({ billSaving: 1000, exportIncome: 0, exportTaxFree: 0, netCost: 2500, inverterCost: 0, batteryCost: 0 }, { ...A, tariffInflation: 0 });
+    const p = paybackFrom(f);
+    expect(p).toBeGreaterThan(2.4);
+    expect(p).toBeLessThan(2.7);
+  });
+  it('taxes export income above the allowance in each year', () => {
+    const f = project({ billSaving: 0, exportIncome: 2000, exportTaxFree: 600, netCost: 0, inverterCost: 0, batteryCost: 0 }, A);
+    expect(f[1].benefit).toBeCloseTo(2000 - 1400 * A.exportTaxRate, 6);
   });
 });
 
@@ -895,4 +916,71 @@ describe('SEAI grant eligibility by year occupied', () => {
     expect(at(PRICES.grants.seaiSolarBuiltBefore - 1).solar).toBe('eligible');
     expect(at(PRICES.grants.seaiSolarBuiltBefore).solar).toBe('ineligible');
   });
+});
+
+describe('export tax by number of people', () => {
+  it('takes nothing off income within the allowance', () => {
+    const x = exportTaxFor(500, 1, A);
+    expect(x.tax).toBe(0);
+    expect(x.kept).toBe(500);
+  });
+  it('taxes only the part above the allowance', () => {
+    const x = exportTaxFor(1000, 1, A);
+    expect(x.allowance).toBe(A.exportTaxFreePerPerson);
+    expect(x.tax).toBeCloseTo((1000 - A.exportTaxFreePerPerson) * A.exportTaxRate, 9);
+    expect(x.kept).toBeCloseTo(1000 - x.tax, 9);
+  });
+  it('doubles the allowance for two people and keeps more', () => {
+    const one = exportTaxFor(1500, 1, A), two = exportTaxFor(1500, 2, A);
+    expect(two.allowance).toBe(2 * one.allowance);
+    expect(two.kept - one.kept).toBeCloseTo(A.exportTaxFreePerPerson * A.exportTaxRate, 9);
+  });
+  it('taxes more at the higher rate and lists both rates', () => {
+    const hi = exportTaxFor(2000, 1, { ...A, exportTaxRate: 0.48 });
+    expect(hi.tax).toBeGreaterThan(exportTaxFor(2000, 1, A).tax);
+    expect(EXPORT_TAX_RATES.map((r) => r.rate)).toEqual([0.28, 0.48]);
+  });
+  it('agrees with the tax in a simulation', () => {
+    const r = simulate(usage(), home(), A, { panels: 12, batteryKwh: 0 });
+    expect(exportTaxFor(r.exportIncome, home().taxpayers, A).tax).toBeCloseTo(r.exportTax, 9);
+  });
+});
+
+describe('payback range', () => {
+  const r = simulate(usage(), home(), A, { panels: 10, batteryKwh: 0 });
+  const [cautious, expected, optimistic] = paybackRange(r, A);
+  it('orders the cases from slowest to quickest payback', () => {
+    expect(cautious.payback).toBeGreaterThan(expected.payback);
+    expect(expected.payback).toBeGreaterThan(optimistic.payback);
+  });
+  it('orders the 25 year gain the other way', () => {
+    expect(cautious.netGain).toBeLessThan(expected.netGain);
+    expect(expected.netGain).toBeLessThan(optimistic.netGain);
+  });
+  it('makes the expected case match the headline numbers', () => {
+    expect(expected.payback).toBeCloseTo(r.paybackYears, 9);
+    expect(expected.netGain).toBeCloseTo(r.netGain, 6);
+    expect(expected.netCost).toBeCloseTo(r.netCost, 6);
+  });
+  it('uses the dearer and cheaper installed prices', () => {
+    expect(cautious.netCost).toBeGreaterThan(optimistic.netCost);
+  });
+});
+
+describe('loan repayment', () => {
+  it('matches a known example', () => {
+    const l = loanPayment(10000, 6, 5);
+    expect(l.monthly).toBeCloseTo(193.33, 1);
+    expect(l.total).toBeCloseTo(l.monthly * 60, 9);
+  });
+  it('splits evenly at zero interest', () => {
+    const l = loanPayment(6000, 0, 5);
+    expect(l.monthly).toBeCloseTo(100, 9);
+    expect(l.interest).toBeCloseTo(0, 9);
+  });
+  it('costs more interest over a longer term', () => {
+    expect(loanPayment(10000, 6, 10).interest).toBeGreaterThan(loanPayment(10000, 6, 5).interest);
+    expect(loanPayment(10000, 6, 10).monthly).toBeLessThan(loanPayment(10000, 6, 5).monthly);
+  });
+  it('is zero for nothing borrowed', () => expect(loanPayment(0, 6, 5).monthly).toBe(0));
 });

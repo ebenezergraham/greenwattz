@@ -102,7 +102,7 @@ function parseRegisters(lines: string[], iVal: number, iType: number, iDate: num
   if (annual > MAX_PLAUSIBLE_KWH) throw new HdfError('The yearly total in this file looks far too high for a home, so we may have misread it. Try the "30-minute readings in kWh" file instead.');
   const cover = obsIdx.length === 12 ? 'all 12 months' : `${obsIdx.length} months (${obsIdx.map((m) => MONTH_NAMES[m]).join(', ')}), the rest estimated`;
   return {
-    annualKwh: Math.round(annual), profile, source: 'smart-meter-daily', bands,
+    annualKwh: Math.round(annual), profile, source: 'smart-meter-daily', bands, hasExport,
     median: medianFromBands(bands, 'mixed'), medianDaily: median(recent.map((d) => d.night + d.offpeak + d.peak)),
     coverage: `${recent.length} days of daily ${hasPeak ? 'night, day and peak' : 'night and day'} totals covering ${cover}. This file has totals for each rate band, not hourly readings, so how use spreads within a band is estimated from your answers.${hasExport ? ' Export readings found, so you may already have solar. Results assume no existing panels.' : ''}`,
   };
@@ -177,6 +177,7 @@ export function parseHdf(text: string): Usage {
     annualKwh: Math.round(annual),
     profile,
     source: 'smart-meter',
+    hasExport,
     coverage: `${spanDays} days of readings covering ${cover}.${hasExport ? ' Export readings found, so you may already have solar. Results assume no existing panels.' : ''}`,
   };
 }

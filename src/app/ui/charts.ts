@@ -32,15 +32,15 @@ export interface Legend { cls: string; text: string }
     svg { width: 100%; height: auto; display: block; }
     .grid { stroke: var(--line); stroke-width: 1; }
     .axis { fill: var(--ink-3); font-size: 11px; font-family: var(--font); }
-    .bar.use, .sw.use { fill: var(--ink-3); background: var(--ink-3); }
-    .bar.night, .sw.night { fill: var(--ink-3); background: var(--ink-3); }
-    .bar.day, .sw.day { fill: var(--accent); background: var(--accent); }
-    .bar.flat, .sw.flat { fill: var(--accent); background: var(--accent); }
-    .bar.peak, .sw.peak { fill: var(--warn); background: var(--warn); }
-    path.sun { fill: color-mix(in srgb, var(--accent) 22%, transparent); stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; }
+    .bar.use, .sw.use { fill: var(--chart-use); background: var(--chart-use); }
+    .bar.night, .sw.night { fill: var(--chart-night); background: var(--chart-night); }
+    .bar.day, .sw.day { fill: var(--chart-day); background: var(--chart-day); }
+    .bar.flat, .sw.flat { fill: var(--chart-day); background: var(--chart-day); }
+    .bar.peak, .sw.peak { fill: var(--chart-peak); background: var(--chart-peak); }
+    path.sun { fill: color-mix(in srgb, var(--sun) 45%, transparent); stroke: var(--sun-strong); stroke-width: 2.5; stroke-linejoin: round; }
     .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 8px; }
     .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
-    .sw.sun { background: var(--accent); }
+    .sw.sun { background: var(--sun); }
   `,
 })
 export class DayChart {
@@ -99,10 +99,10 @@ export class DayChart {
     svg { width: 100%; height: auto; display: block; }
     .axis { fill: var(--ink-3); font-size: 11px; font-family: var(--font); }
     .base { stroke: var(--line); }
-    .d { fill: var(--ink-3); } .g { fill: var(--accent); }
+    .d { fill: var(--chart-use); } .g { fill: var(--sun); }
     .legend { display: flex; gap: 18px; margin-top: 8px; }
     .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
-    .sw.d { background: var(--ink-3); } .sw.g { background: var(--accent); }
+    .sw.d { background: var(--chart-use); } .sw.g { background: var(--sun); }
   `,
 })
 export class MonthChart {
@@ -134,8 +134,8 @@ export class MonthChart {
     :host { display: block; } svg { width: 100%; height: auto; display: block; }
     .axis { fill: var(--ink-3); font-size: 11px; font-family: var(--font); }
     .zero { stroke: var(--ink-3); stroke-dasharray: 4 4; }
-    .line { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linejoin: round; }
-    .area { fill: color-mix(in srgb, var(--accent) 14%, transparent); }
+    .line { fill: none; stroke: var(--sun-strong); stroke-width: 3.5; stroke-linejoin: round; }
+    .area { fill: color-mix(in srgb, var(--sun) 35%, transparent); }
   `,
 })
 export class CashChart {

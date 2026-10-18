@@ -1,14 +1,18 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router } from '@angular/router';
 import { RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
 import { PlanStore } from '../core/store';
-import { Assumptions, PRICES, grantEligibility, seaiGrantFor, BATTERY_GUIDE, BATTERY_OPTIONS, BATTERY_TIERS, BatteryTier, batteryPrice, HOUSE_TYPES, HouseType, OBSTACLES, ObstacleKey, ROOF_TYPES, RoofType, Storeys, Orientation, Occupancy, Shading, Scenario, Tariff, bandsOfDay, simulate, solarDay } from '../core/engine';
+import { Assumptions, BATTERY_SIZES, loanPayment, paybackRange, EXPORT_TAX_RATES, exportTaxFor, PRICES, grantEligibility, seaiGrantFor, BATTERY_GUIDE, BATTERY_OPTIONS, BATTERY_TIERS, BatteryTier, batteryPrice, HOUSE_TYPES, HouseType, OBSTACLES, ObstacleKey, ROOF_TYPES, RoofType, Storeys, Orientation, Occupancy, Shading, Scenario, Tariff, bandsOfDay, simulate, solarDay } from '../core/engine';
 import { HdfError, parseHdf } from '../core/hdf';
+import { inferHousehold } from '../core/infer';
 import { CashChart, DayChart, Legend, MonthChart } from '../ui/charts';
 import { EstimateNote } from '../ui/estimate-note';
 import { INSTALLER_CHECKLIST } from '../core/site';
 
-const STEPS = ['Home', 'Usage', 'Strategy', 'Cost'];
+const STEPS = ['Usage', 'Home', 'Strategy', 'Cost'];
+export const STEP_KEYS = ['usage', 'home', 'strategy', 'cost'];
 
 @Component({
   selector: 'page-plan',
@@ -19,7 +23,20 @@ const STEPS = ['Home', 'Usage', 'Strategy', 'Cost'];
 export class PlanPage {
   readonly s = inject(PlanStore);
   readonly steps = STEPS;
+  private router = inject(Router);
+  private route = inject(ActivatedRoute);
+  /** The step lives in the URL (?step=cost), so browser Back and links to a step work. */
   readonly step = signal(0);
+  readonly batterySizes = BATTERY_SIZES;
+  readonly lastBattery = signal(10);
+  readonly hasBattery = computed(() => this.cfg().batteryKwh > 0);
+  setHasBattery(on: boolean) { this.setBattery(on ? this.lastBattery() : 0); }
+  constructor() {
+    this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((q) => {
+      const i = STEP_KEYS.indexOf(q.get('step') ?? 'usage');
+      this.step.set(i < 0 ? 0 : i);
+    });
+  }
   readonly fileError = signal('');
   readonly fileName = signal('');
   readonly showAssump = signal(false);
@@ -96,13 +113,13 @@ export class PlanPage {
     const unknown = e.solar === 'unknown';
     const solar = !a.seaiGrant ? 'You switched this grant off in the assumptions.'
       : e.solar === 'ineligible' ? `Not eligible: first occupied in ${this.s.home().yearOccupied}, after the ${cut} cut-off.`
-      : unknown ? 'Assumed eligible. Enter the year your home was first occupied in step 1 to check.'
+      : unknown ? 'Assumed eligible. Enter the year your home was first occupied on the Home step to check.'
       : 'Eligible on age. Other conditions below also apply.';
     const hasBattery = this.cfg().batteryKwh > 0;
     const battery = e.battery === 'ineligible' ? `Not eligible: first occupied in ${this.s.home().yearOccupied}, after the ${cut} cut-off.`
       : !hasBattery ? `No battery in this plan. A battery of ${g.seaiBatteryMinKwh} kWh or more would qualify.`
       : !a.seaiBatteryGrant ? 'You switched this grant off in the assumptions.'
-      : unknown ? 'Assumed eligible. Enter the year your home was first occupied in step 1 to check.'
+      : unknown ? 'Assumed eligible. Enter the year your home was first occupied on the Home step to check.'
       : 'Eligible on age. Other conditions below also apply.';
     return {
       solar: { text: solar, amount: r.grant ? this.eur(r.grant) : (e.solar === 'ineligible' || !a.seaiGrant ? 'Not applied' : this.eur(seaiGrantFor(r.kwp))) },
@@ -113,6 +130,15 @@ export class PlanPage {
   readonly payersHint = computed(() => {
     const per = this.s.assumptions().exportTaxFreePerPerson, n = this.s.home().taxpayers;
     return `Export income is tax-free up to ${this.eur(per)} for each person named on the bill, so ${this.eur(per * n)} for ${n === 1 ? 'one person' : 'two'}. Above that it is taxed.`;
+  });
+  /** What the meter data suggests, in plain words, so the user can see what we filled in and why. */
+  readonly notes = computed<{ text: string; warn: boolean }[]>(() => {
+    const n = this.s.noticed(), out: { text: string; warn: boolean }[] = [];
+    if (n.occupancy) out.push({ text: `${n.occupancy.why} We use your real readings, so you do not need to answer who is home.`, warn: false });
+    if (n.nightLoad) out.push({ text: n.nightLoad.why + ' That is typical of an electric car or night-time heating, so we will ask on the Home step whether to count a new one.', warn: false });
+    if (n.winterHeavy) out.push({ text: n.winterHeavy.why + ' That often means electric heating or a heat pump.', warn: false });
+    if (n.existingSolar) out.push({ text: 'Your file has export readings, so you may already have solar. This planner assumes you have none, so savings will look larger than they are.', warn: true });
+    return out;
   });
   readonly isMedian = computed(() => !!this.s.usage().median);
   /** True for the daily night/day/peak file: band totals are measured, hours inside a band are estimated. */
@@ -186,9 +212,20 @@ export class PlanPage {
     return { text, years, extraCost: Math.round(extraCost), extraBenefit: Math.round(extraBenefit) };
   });
 
-  go(n: number) { this.step.set(Math.max(0, Math.min(3, n))); scrollTo({ top: 0, behavior: 'smooth' }); }
+  /** The chosen panels with no battery and with each common battery size, so the cost of adding storage is plain to see. */
+  readonly compare = computed(() => {
+    const a = this.s.assumptions(), h = this.s.home(), u = this.s.usage();
+    const panels = this.r().panels;
+    const base = simulate(u, h, a, { panels, batteryKwh: 0 });
+    return [0, ...BATTERY_SIZES].map((kwh) => {
+      const x = kwh === 0 ? base : simulate(u, h, a, { panels, batteryKwh: kwh });
+      return { kwh, r: x, extraBenefit: x.annualBenefit - base.annualBenefit, extraGain: x.netGain - base.netGain, current: x.batteryKwh === this.r().batteryKwh };
+    });
+  });
 
-  setOcc(v: Occupancy) { this.s.patchHome({ occupancy: v }); }
+  go(n: number) { const i = Math.max(0, Math.min(3, n)); this.router.navigate([], { relativeTo: this.route, queryParams: { step: STEP_KEYS[i] }, queryParamsHandling: 'merge' }); scrollTo({ top: 0, behavior: 'instant' }); }
+
+  setOcc(v: Occupancy) { this.s.occupancyTouched.set(true); this.s.patchHome({ occupancy: v }); }
   setOri(v: Orientation) { this.s.patchHome({ orientation: v }); }
   setShade(v: Shading) { this.s.patchHome({ shading: v }); }
   num(e: Event): number { return +(e.target as HTMLInputElement).value; }
@@ -203,6 +240,9 @@ export class PlanPage {
       const text = await f.text(); // read locally, never uploaded
       const usage = parseHdf(text);
       this.s.meterUsage.set(usage);
+      // pre-fill from what the readings show, unless the user has already answered it themselves
+      const seen = inferHousehold(usage);
+      if (seen.occupancy && !this.s.occupancyTouched()) this.s.patchHome({ occupancy: seen.occupancy.value });
       if (usage.bands) this.s.patchAssumptions({ tariff: usage.bands.hasPeak ? 'smart' : 'dayNight' }); // the file's own rate bands
       this.s.mode.set('meter');
       this.fileName.set(f.name);
@@ -223,12 +263,36 @@ export class PlanPage {
   pickStrategy(x: Scenario) { this.s.pick({ panels: x.panels, batteryKwh: x.batteryKwh }); }
   isPicked(x: Scenario) { return x.panels === this.cfg().panels && x.batteryKwh === this.cfg().batteryKwh; }
   setPanels(e: Event) { this.s.pick({ ...this.cfg(), panels: this.num(e) }); }
-  setBattery(b: number) { this.s.pick({ ...this.cfg(), batteryKwh: b }); }
+  setBattery(b: number) { if (b > 0) this.lastBattery.set(b); this.s.pick({ ...this.cfg(), batteryKwh: b }); }
 
-  print() { window.print(); }
+  print() {
+    // closed disclosures would be left out of the PDF, so open them for printing and restore afterwards
+    const all = [...document.querySelectorAll('details')] as HTMLDetailsElement[];
+    const was = all.map((d) => d.open);
+    all.forEach((d) => (d.open = true));
+    addEventListener('afterprint', () => all.forEach((d, i) => (d.open = was[i])), { once: true });
+    window.print();
+  }
   eur(n: number): string { return '€' + Math.round(n).toLocaleString('en-IE'); }
   max0(n: number): number { return Math.max(0, n); }
   eur0(n: number): string { return this.eur(Math.round(n / 50) * 50); }
-  payback(y: number): string { return isFinite(y) && y < 40 ? y.toFixed(1) + ' years' : 'Over 40 years'; }
+  readonly taxRates = EXPORT_TAX_RATES;
+  /** Export income and tax with one person and with two on the bill, for the plan the user has chosen. */
+  readonly exportView = computed(() => {
+    const income = this.r().exportIncome;
+    return [1, 2].map((n) => exportTaxFor(income, n, this.s.assumptions()));
+  });
+  readonly range = computed(() => paybackRange(this.r(), this.s.assumptions()));
+  readonly loanYears = signal(7);
+  readonly loanRate = signal(7);
+  readonly loanTerms = [5, 7, 10];
+  readonly loan = computed(() => {
+    const l = loanPayment(this.r().netCost, this.loanRate(), this.loanYears());
+    const monthlyBenefit = this.r().annualBenefit / 12;
+    return { ...l, monthlyBenefit, net: monthlyBenefit - l.monthly };
+  });
+  setLoanRate(e: Event) { const v = this.num(e); if (v >= 0 && v <= 30) this.loanRate.set(v); }
+  abs(n: number) { return Math.abs(n); }
+  payback(y: number): string { return isFinite(y) && y <= 25 ? y.toFixed(1) + ' years' : 'Over 25 years'; }
   pc(n: number): string { return Math.round(n * 100) + '%'; }
 }

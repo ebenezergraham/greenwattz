@@ -1,3 +1,4 @@
+import { inferHousehold } from './infer';
 import { Injectable, computed, signal } from '@angular/core';
 import {
   Assumptions, Config, DEFAULT_ASSUMPTIONS, averageDay, medianFromBands, profileFromBands, bandBreakdown, dayStats, HOUSE_TYPES, HomeInputs, HouseType, NO_OBSTACLES, ObstacleKey, usableArea, obstacleArea, Usage, annualFromBill, buildGrid, cashflow,
@@ -31,6 +32,12 @@ export class PlanStore {
     return { annualKwh: kwh, profile: estimateProfile(kwh, h.occupancy), source: 'estimate' };
   });
   readonly usage = computed(() => withExtras(this.baseUsage(), this.home()));
+  /** What the meter data suggests about the home. Empty until real readings are loaded. */
+  readonly noticed = computed(() => (this.mode() === 'meter' && this.meterUsage() ? inferHousehold(this.meterUsage()!) : {}));
+  /** True once the user has chosen who is home themselves, so a meter file never overrides it later. */
+  readonly occupancyTouched = signal(false);
+  /** Hourly meter readings tell us when people are home, so the question is not needed. */
+  readonly hourlyMeter = computed(() => this.mode() === 'meter' && this.meterUsage()?.source === 'smart-meter');
   /** The day we describe to the user: the median day from meter data, else the average day. */
   readonly dayShape = computed(() => this.usage().median ?? averageDay(this.usage().profile));
   readonly bands = computed(() => bandBreakdown(this.usage().profile, this.assumptions(), this.dayShape()));

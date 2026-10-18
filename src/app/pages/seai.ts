@@ -63,7 +63,7 @@ const PAGE = 40;
     .row { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; padding: 18px 22px; }
     .row h2 { font-size: 1.1rem; letter-spacing: -0.01em; }
     .info { display: grid; gap: 2px; .small a { margin-left: 10px; } }
-    .empty { display: grid; gap: 10px; justify-items: start; i { font-size: 2rem; color: var(--accent); } code { background: var(--surface-2); padding: 2px 6px; border-radius: 6px; font-size: 0.85em; } }
+    .empty { display: grid; gap: 10px; justify-items: start; i { font-size: 2rem; color: var(--sun-strong); } code { background: var(--surface-2); padding: 2px 6px; border-radius: 6px; font-size: 0.85em; } }
   `,
 })
 export class SeaiPage {

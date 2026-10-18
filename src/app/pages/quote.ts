@@ -9,12 +9,6 @@ const HOUSE_LABEL = Object.fromEntries(HOUSE_TYPES.map((t) => [t.key, t.label.to
 import { INTRODUCTION_INSTALLERS, SITE } from '../core/site';
 import { Installer, PRIORITIES, Priority, rank, siteUrl, mapsUrl, seaiMatch } from '../core/installers';
 
-const LEVELS = [
-  { v: 0, label: 'Skip' },
-  { v: 1, label: 'Important' },
-  { v: 2, label: 'Top priority' },
-];
-
 @Component({
   selector: 'page-quote',
   imports: [RouterLink, DecimalPipe, EstimateNote],
@@ -26,17 +20,16 @@ const LEVELS = [
 
       <div class="grid">
         <section class="main">
-          <h2>What matters most?</h2>
-          <div class="card prefs">
+          <h2 class="qh">What matters most?</h2>
+          <fieldset class="picks">
+            <legend class="hint">Pick up to three. Leave all unticked to weigh them equally.</legend>
             @for (p of priorities; track p.key) {
-              <div class="pref">
-                <span class="lbl" [id]="'p-' + p.key">{{ p.label }}</span>
-                <div class="seg" role="group" [attr.aria-labelledby]="'p-' + p.key">
-                  @for (l of levels; track l.v) { <button type="button" [attr.aria-pressed]="weights()[p.key] === l.v" (click)="set(p.key, l.v)">{{ l.label }}</button> }
-                </div>
-              </div>
+              <label class="pick" [class.on]="picks().has(p.key)">
+                <input type="checkbox" [checked]="picks().has(p.key)" [disabled]="!picks().has(p.key) && picks().size >= 3" (change)="toggleKey(p.key)" />
+                <span>{{ p.label }}</span>
+              </label>
             }
-          </div>
+          </fieldset>
 
           <div class="notice"><i class="ph ph-warning"></i><span>Today we rank on Trustpilot reputation, adjusted for how many reviews each installer has. We do not yet hold verified data on {{ unbacked() }}, so those priorities do not change the order. Use the questions under each installer to compare them yourself.</span></div>
 
@@ -128,18 +121,21 @@ const LEVELS = [
     @media (max-width: 960px) { .grid { grid-template-columns: 1fr; } }
     .side { position: sticky; top: 92px; }
     @media (max-width: 960px) { .side { position: static; } }
-    .prefs { display: grid; gap: 18px; }
-    .pref { display: grid; grid-template-columns: 150px 1fr; gap: 12px; align-items: center; }
-    @media (max-width: 560px) { .pref { grid-template-columns: 1fr; } }
+    .qh { font-family: var(--font); font-stretch: 100%; font-weight: 650; letter-spacing: -0.01em; font-size: 1.15rem; margin: 28px 0 10px; }
+    .picks { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; legend { padding: 0; margin-bottom: 10px; width: 100%; } }
+    .pick { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 18px; border: 1.5px solid var(--ink-3); border-radius: var(--r-pill); cursor: pointer; font-weight: 600; background: var(--surface); input { width: 18px; height: 18px; accent-color: var(--ink); margin: 0; } }
+    .pick.on { background: var(--ink); color: var(--bg); border-color: var(--ink); input { accent-color: var(--sun); } }
+    .pick:has(input:disabled) { opacity: 0.45; cursor: not-allowed; }
+    .pick:has(input:focus-visible) { outline: 3px solid var(--focus); outline-offset: 3px; }
     .notice { margin-top: 18px; }
     .list { list-style: none; padding: 0; margin: 0; display: grid; gap: 14px; }
     .item { display: grid; grid-template-columns: 44px 1fr; gap: 16px; border-width: 1.5px; }
-    .item.sel { border-color: var(--accent); background: color-mix(in srgb, var(--accent-soft) 40%, var(--surface)); }
+    .item.sel { border-color: var(--ink); background: var(--surface-2); }
     .rank { width: 40px; height: 40px; border-radius: var(--r-ctl); background: var(--surface-2); display: grid; place-items: center; font-weight: 650; font-size: 1.1rem; }
     .body { display: grid; gap: 10px; min-width: 0; }
     .head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
     .head h3 { font-size: 1.25rem; }
-    .small i { color: var(--accent); }
+    .small i { color: var(--sun-strong); }
     details { color: var(--ink-2); font-size: 0.92rem; summary { cursor: pointer; font-weight: 600; color: var(--ink); } ul { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 6px; } }
     .acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; }
     .intro { margin-top: 24px; display: grid; gap: 16px; }
@@ -157,8 +153,12 @@ export class QuotePage {
   readonly r = this.store.result;
   readonly site = SITE;
   readonly priorities = PRIORITIES;
-  readonly levels = LEVELS;
-  readonly weights = signal<Record<Priority, number>>({ price: 1, quality: 1, warranty: 1, aftercare: 1, communication: 1 });
+  /** The things the user ticked. Ticked counts double; with none ticked everything counts equally. */
+  readonly picks = signal<Set<Priority>>(new Set());
+  readonly weights = computed<Record<Priority, number>>(() => {
+    const c = this.picks();
+    return Object.fromEntries(PRIORITIES.map((p) => [p.key, c.has(p.key) ? 2 : 1])) as Record<Priority, number>;
+  });
   readonly picked = signal<Set<string>>(new Set());
   readonly wantsIntro = signal<boolean | null>(null);
   readonly err = signal('');
@@ -173,18 +173,18 @@ export class QuotePage {
 
   /** Question prompts for the priorities the user marked, so they can compare installers themselves. */
   readonly asks = computed(() => {
-    const w = this.weights();
-    const qs = PRIORITIES.filter((p) => w[p.key] > 0).sort((a, b) => w[b.key] - w[a.key]).map((p) => p.ask);
+    const c = this.picks();
+    const qs = (c.size ? PRIORITIES.filter((p) => c.has(p.key)) : PRIORITIES).map((p) => p.ask);
     return qs.length ? qs : null;
   });
   readonly unbacked = computed(() => {
     const have = new Set(this.ranked().flatMap((r) => r.backed));
-    const w = this.weights();
-    const miss = PRIORITIES.filter((p) => w[p.key] > 0 && !have.has(p.key)).map((p) => p.label.toLowerCase());
+    const c = this.picks();
+    const miss = (c.size ? PRIORITIES.filter((p) => c.has(p.key)) : PRIORITIES).filter((p) => !have.has(p.key)).map((p) => p.label.toLowerCase());
     return miss.length ? miss.join(', ') : 'none of your priorities';
   });
 
-  set(k: Priority, v: number) { this.weights.update((w) => ({ ...w, [k]: v })); }
+  toggleKey(k: Priority) { this.picks.update((c) => { const n = new Set(c); n.has(k) ? n.delete(k) : n.add(k); return n; }); }
   toggle(slug: string) { this.picked.update((s) => { const n = new Set(s); n.has(slug) ? n.delete(slug) : n.add(slug); return n; }); if (!this.introFor().length) this.wantsIntro.set(null); }
   names(keys: Priority[]) { return keys.map((k) => PRIORITIES.find((p) => p.key === k)!.label.toLowerCase()).join(', '); }
   maps(i: Installer) { return mapsUrl(i); }

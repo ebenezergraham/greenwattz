@@ -15,7 +15,7 @@ type Sort = 'adjusted' | 'score' | 'count' | 'name';
       <p class="lead">Existing customer ratings from Trustpilot and Google Maps, side by side, so you can compare Irish installers before you ask for a quote.</p>
       <div class="notice info"><i class="ph ph-info"></i><span>We show each platform's overall score and review count, and link to the reviews themselves. Scores were read from public Trustpilot pages on {{ asOf }}. They change, so check the live page. We do not edit or host the reviews.</span></div>
 
-      <div class="controls card">
+      <div class="controls">
         <search-box label="Search installers" [items]="names" [(value)]="q" />
         <div class="field"><label for="s">Sort by</label>
           <select id="s" [value]="sort()" (change)="sort.set($any($event.target).value)">
@@ -34,32 +34,37 @@ type Sort = 'adjusted' | 'score' | 'count' | 'name';
       <p class="small muted">"Adjusted" pulls small samples towards the average, so a 4.9 from 20 reviews does not beat a 4.7 from 3,000.</p>
 
       @if (list().length) {
-        <div class="providers">
+        <div class="cols" aria-hidden="true"><span>Installer</span><span>Trustpilot</span><span>Google Maps</span><span></span></div>
+        <ul class="providers">
           @for (i of list(); track i.slug) {
-            <article class="card prov">
-              <div class="head"><div><h2><a [routerLink]="['/reviews', i.slug]">{{ i.name }}</a></h2><span class="small muted">{{ i.kind }}</span></div>@if (seai(i)) { <span class="chip" title="Found on the SEAI register of solar PV companies"><i class="ph-fill ph-seal-check"></i> SEAI</span> }</div>
-              <div class="src">
-                <div class="where"><i class="ph-fill ph-star"></i><span>Trustpilot</span></div>
+            <li class="prov">
+              <div class="who">
+                <h2><a [routerLink]="['/reviews', i.slug]">{{ i.name }}</a></h2>
+                <span class="small muted">{{ i.kind }}</span>
+                @if (seai(i)) { <span class="seal small" title="Found on the SEAI register of solar PV companies"><i class="ph-fill ph-seal-check" aria-hidden="true"></i> On the SEAI register</span> }
+              </div>
+              <div class="src" data-l="Trustpilot">
                 @if (i.trustpilot; as t) {
-                  <div class="val"><b class="num">{{ t.score | number: '1.1-1' }}</b><span class="small muted num">{{ t.count | number }} reviews</span></div>
+                  <b class="score num">{{ t.score | number: '1.1-1' }}</b>
+                  <span class="small muted num">{{ t.count | number }} reviews</span>
                   @if (t.count < 100) { <span class="small warn">Few reviews, treat with care</span> }
                 }
               </div>
-              <div class="src">
-                <div class="where"><i class="ph ph-map-pin"></i><span>Google Maps</span></div>
+              <div class="src" data-l="Google Maps">
                 @if (i.google; as g) {
-                  <div class="val"><b class="num">{{ g.rating | number: '1.1-1' }}</b><span class="small muted num">{{ g.count | number }} reviews</span></div>
+                  <b class="score num">{{ g.rating | number: '1.1-1' }}</b>
+                  <span class="small muted num">{{ g.count | number }} reviews</span>
                 } @else {
                   <a class="small" [href]="mapsUrl(i)" target="_blank" rel="noopener noreferrer">Check on Google Maps</a>
                 }
               </div>
-              <div class="row">
+              <div class="acts">
                 <a class="btn sm" [routerLink]="['/reviews', i.slug]">Details</a>
-                @if (i.trustpilot; as t) { <a class="btn sm ghost" [href]="t.url" target="_blank" rel="noopener noreferrer">Read on Trustpilot</a> }
+                @if (i.trustpilot; as t) { <a class="btn sm ghost" [href]="t.url" target="_blank" rel="noopener noreferrer">Trustpilot</a> }
               </div>
-            </article>
+            </li>
           }
-        </div>
+        </ul>
       } @else {
         <div class="card empty"><i class="ph ph-magnifying-glass"></i><p>No installers match those filters. Clear the search or lower the minimum.</p></div>
       }
@@ -68,19 +73,29 @@ type Sort = 'adjusted' | 'score' | 'count' | 'name';
   styles: `
     .page { padding: 48px 0 0; display: grid; gap: 20px; }
     .lead { font-size: 1.15rem; color: var(--ink-2); max-width: 62ch; }
-    .controls { display: grid; grid-template-columns: 1.2fr 1.4fr 1fr; gap: 16px; }
+    .controls { display: grid; grid-template-columns: 1.2fr 1.4fr 1fr; gap: 16px; margin-top: 8px; }
     @media (max-width: 760px) { .controls { grid-template-columns: 1fr; } }
-    .providers { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
-    .prov { display: grid; gap: 14px; align-content: start; }
-    .prov h2 { font-size: 1.25rem; letter-spacing: -0.02em; }
-    .prov h2 a { color: var(--ink); text-decoration: none; }
-    .prov h2 a:hover { text-decoration: underline; }
-    .src { display: grid; gap: 4px; padding-top: 12px; border-top: 1px solid var(--line); }
-    .where { display: flex; align-items: center; gap: 8px; color: var(--ink-2); font-weight: 600; font-size: 0.9rem; i { color: var(--accent); } }
-    .val { display: flex; align-items: baseline; gap: 10px; b { font-size: 1.7rem; letter-spacing: -0.03em; } }
+    .cols, .prov { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr) auto; gap: 20px; align-items: center; }
+    .cols { margin-top: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); font-size: 0.82rem; color: var(--ink-3); }
+    .providers { list-style: none; margin: 0; padding: 0; }
+    .prov { padding: 18px 0; border-bottom: 1px solid var(--line); }
+    .who { display: grid; gap: 2px; justify-items: start; }
+    .who h2 { font-family: var(--font); font-stretch: 100%; font-weight: 650; letter-spacing: -0.015em; font-size: 1.15rem; line-height: 1.25; }
+    .who h2 a { color: var(--ink); text-decoration: none; }
+    .who h2 a:hover { text-decoration: underline; text-underline-offset: 4px; }
+    .seal { display: inline-flex; align-items: center; gap: 4px; color: var(--ink-2); font-weight: 600; i { color: var(--sun-strong); font-size: 1rem; } }
+    .src { display: grid; gap: 0; align-content: center; }
+    .score { font-family: var(--display); font-stretch: 78%; font-weight: 800; font-size: 2.2rem; line-height: 1; }
     .warn { color: var(--warn); font-weight: 600; }
-    .row { display: flex; gap: 8px; flex-wrap: wrap; }
-    .empty { display: grid; justify-items: start; gap: 8px; i { font-size: 2rem; color: var(--accent); } }
+    .acts { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    @media (max-width: 820px) {
+      .cols { display: none; }
+      .prov { grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+      .who, .acts { grid-column: 1 / -1; }
+      .acts { justify-content: flex-start; }
+      .src::before { content: attr(data-l); font-size: 0.75rem; color: var(--ink-3); }
+    }
+    .empty { display: grid; justify-items: start; gap: 8px; i { font-size: 2rem; color: var(--sun-strong); } }
   `,
 })
 export class ReviewsPage {
@@ -171,7 +186,7 @@ const TOPICS = [
     .page { padding: 48px 0 0; display: grid; gap: 18px; }
     .srcs { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; .card { display: grid; gap: 10px; align-content: start; justify-items: start; } }
     @media (max-width: 640px) { .srcs { grid-template-columns: 1fr; } }
-    .where { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--ink-2); i { color: var(--accent); } }
+    .where { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--ink-2); i { color: var(--sun-strong); } }
     .val { display: grid; gap: 2px; b { font-size: 2.6rem; letter-spacing: -0.04em; line-height: 1; } }
     .topics, .row { display: flex; flex-wrap: wrap; gap: 8px; }
     .tips { padding-left: 20px; display: grid; gap: 10px; margin: 0; }

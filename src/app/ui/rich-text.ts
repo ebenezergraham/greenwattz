@@ -13,7 +13,7 @@ import { parseInline } from '../core/rich';
     }
     @else { <ng-container>{{ s.text }}</ng-container> }
   }`,
-  styles: `:host { display: contents; } a { color: var(--accent); text-underline-offset: 3px; } strong { font-weight: 650; }`,
+  styles: `:host { display: contents; } a { color: var(--link); text-underline-offset: 3px; } strong { font-weight: 650; }`,
 })
 export class RichText {
   readonly text = input.required<string>();
