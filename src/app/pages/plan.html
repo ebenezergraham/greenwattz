@@ -349,10 +349,26 @@
               </div>
             </div>
           </div>
+          <div class="q">
+            <span class="ql" id="lean">Balance</span>
+            <div class="qc">
+              <div class="seg" role="group" aria-labelledby="lean">
+                @for (l of leans; track l.key) { <button type="button" [attr.aria-pressed]="(s.goals().lean ?? 'balanced') === l.key" (click)="setLean(l.key)">{{ l.label }}</button> }
+              </div>
+              <p class="hint">{{ leanHint() }}</p>
+            </div>
+          </div>
           @if (s.strategies()[1].meetsGoals) {
             <p class="ok" role="status"><i class="ph-fill ph-check-circle"></i> The recommended option meets both goals.</p>
           } @else {
             <p class="hint warn" role="status">Your roof and connection cannot reach both goals. The recommended option gets closest: {{ pc(s.strategies()[1].selfSufficiency) }} of your use covered and about {{ eur0(s.strategies()[1].exportIncome) }} a year from exports.</p>
+          }
+          @if (mixStatus().custom) {
+            <p class="hint" role="status">
+              <b>Your own mix:</b> {{ r().panels }} panels{{ r().batteryKwh ? ' and a ' + r().batteryKwh + ' kWh battery' : ', no battery' }} covers {{ pc(mixStatus().cover) }} of your use{{ s.goals().exportIncome ? ' and earns about ' + eur0(mixStatus().exportIncome) + ' a year from exports' : '' }}.
+              {{ mixStatus().meetsCover && mixStatus().meetsExport ? 'That meets your goals.' : 'That is short of your goals.' }}
+              <button class="linklike" type="button" (click)="resetMix()">Use the recommendation instead</button>
+            </p>
           }
         </section>
 
@@ -365,7 +381,7 @@
                 <span class="t"><b>{{ x.label }}</b>@if (x.key === 'best') { <span class="chip">Recommended</span> }<span class="small muted">{{ x.blurb }}</span></span>
               </span>
               <span class="sy num">{{ x.kwp | number: '1.1-1' }} kWp<span class="small muted">{{ x.panels }} panels{{ x.batteryKwh ? ', ' + x.batteryKwh + ' kWh battery' : ', no battery' }}</span></span>
-              <span class="r num pay" data-l="You pay"><b>{{ eur0(x.netCost) }}</b><span class="small muted">{{ x.grant + x.batteryGrant ? eur0(x.grossCost) + ' less ' + eur0(x.grant + x.batteryGrant) : eur0(x.grossCost) + ', no grants' }}</span></span>
+              <span class="r num pay" data-l="You pay"><b>{{ eur0(x.netCost) }}</b><span class="small muted">{{ x.grant + x.batteryGrant ? eur0(x.grossCost) + ' less ' + eur0(x.grant + x.batteryGrant) : eur0(x.grossCost) + (grantsPending() ? ', grants not counted yet' : ', no grants') }}</span></span>
               <span class="r num" data-l="Payback">{{ payback(x.paybackYears) }}</span>
               <span class="r num" data-l="Covers">{{ pc(x.selfSufficiency) }}</span>
             </button>
@@ -469,6 +485,33 @@
         <section class="grp">
           <h2>Do you need a battery?</h2>
           <p class="prose">{{ batteryVerdict().text }}</p>
+          @for (n of mixNotes(); track n.kind) { <p class="hint warn" role="status">{{ n.text }}</p> }
+
+          <h3 class="wh">Size it to the times you want covered</h3>
+          <p class="hint">Pick the parts of the day you would like the battery to power. We work out what you use then, after your panels have covered what they can.</p>
+          <div class="seg zones" role="group" aria-label="Times of day to cover">
+            @for (z of zoneInfo().zones; track z.key) { <button type="button" [attr.aria-pressed]="zoneSel().includes(z.key)" (click)="toggleZone(z.key)">{{ z.label }} <span class="muted small">{{ z.when }}</span></button> }
+          </div>
+          <div class="cmp zn">
+            <div class="cmp-head" aria-hidden="true"><span>Time of day</span><span class="r">Average day</span><span class="r">December</span><span class="r">June</span></div>
+            @for (z of zoneInfo().zones; track z.key) {
+              <div class="cmp-row" [class.cur]="zoneSel().includes(z.key)">
+                <span class="nm"><b>{{ z.label }}</b><span class="small muted">{{ z.when }}</span></span>
+                <span class="r num" data-l="Average day">{{ z.average | number: '1.1-1' }} kWh</span>
+                <span class="r num" data-l="December">{{ z.winter | number: '1.1-1' }} kWh</span>
+                <span class="r num" data-l="June">{{ z.summer | number: '1.1-1' }} kWh</span>
+              </div>
+            }
+          </div>
+          @if (zoneSize().size > 0) {
+            <p class="prose">To cover {{ zoneSel().length > 1 ? 'these times' : 'this time' }} you need about <b class="num">{{ zoneSize().needKwh | number: '1.1-1' }} kWh</b> of usable battery on an average day, which is <b class="num">{{ zoneSize().nominalKwh | number: '1.1-1' }} kWh</b> as sold (10% is kept in reserve).
+              @if (zoneSize().tooBig) { That is more than the largest single size we test ({{ zoneSize().size }} kWh), so you would need to stack batteries or cover fewer times. }
+              @else { The nearest standard size is <b class="num">{{ zoneSize().size }} kWh</b>. }
+              <button class="btn sm" type="button" (click)="useZoneSize()" [disabled]="cfg().batteryKwh === zoneSize().size">{{ cfg().batteryKwh === zoneSize().size ? 'Using ' + zoneSize().size + ' kWh' : 'Use ' + zoneSize().size + ' kWh' }}</button></p>
+            <p class="hint">Your panels leave about <span class="num">{{ zoneInfo().surplusAverage | number: '1.1-1' }} kWh</span> a day over the year to charge it ({{ zoneInfo().surplusWinter | number: '1.1-1' }} kWh in December). That could fill about {{ pc(zoneSize().chargedAverage) }} of the need on an average day and {{ pc(zoneSize().chargedWinter) }} in December.@if (zoneSize().chargedWinter < 0.7) { In winter the sun will not fill it, so charging from the grid at the night rate would help. }</p>
+          } @else {
+            <p class="hint">Choose at least one time of day to see a size.</p>
+          }
           <p class="hint">SEAI pays a €{{ grantsCfg.seaiBattery }} <a routerLink="/glossary" fragment="battery-grant">grant</a> towards a battery of {{ grantsCfg.seaiBatteryMinKwh }} kWh or more fitted by a registered solar installer, if your home qualifies. <a [href]="links.batteryGrant" target="_blank" rel="noopener noreferrer">SEAI battery grant</a></p>
           <details class="more">
             <summary>Which size suits whom</summary>
@@ -492,7 +535,10 @@
       @if (step() === 3) {
         <h1>Your solar plan</h1>
         <p class="answer">{{ r().panels }} panels ({{ r().kwp | number: '1.1-1' }} kWp){{ r().batteryKwh ? ' with a ' + r().batteryKwh + ' kWh battery' : ', no battery' }}. You would pay about <strong class="num">{{ eur0(r().netCost) }}</strong> after grants, get about <strong class="num">{{ eur0(r().annualBenefit) }}</strong> a year back, and break even in <strong class="num">{{ payback(r().paybackYears) }}</strong>.</p>
-        <p class="calc num">{{ eur0(r().grossCost) }} installed@if (r().grant) { - {{ eur0(r().grant) }} SEAI solar grant }@if (r().batteryGrant) { - {{ eur0(r().batteryGrant) }} SEAI battery grant } = <b>{{ eur0(r().netCost) }}</b> you pay @if (!r().grant && !r().batteryGrant) { <span class="muted">(no SEAI grants applied, see SEAI grants below)</span> }</p>
+        <p class="calc num">{{ eur0(r().grossCost) }} installed@if (r().grant) { - {{ eur0(r().grant) }} SEAI solar grant }@if (r().batteryGrant) { - {{ eur0(r().batteryGrant) }} SEAI battery grant } = <b>{{ eur0(r().netCost) }}</b> you pay @if (!r().grant && !r().batteryGrant) { @if (grantsPending()) { <span class="muted">(SEAI grants not counted yet)</span> } @else { <span class="muted">(no SEAI grants applied, see SEAI grants below)</span> } }</p>
+        @if (grantsPending()) {
+          <p class="hint warn" role="status">SEAI grants are not in these costs because we do not know yet if your home qualifies. If it was first occupied before {{ grantsCfg.seaiSolarBuiltBefore }}, you could get up to {{ eur0(grantsPossible().total) }} off{{ grantsPossible().battery ? ' (' + eur0(grantsPossible().solar) + ' solar, ' + eur0(grantsPossible().battery) + ' battery)' : '' }}. <button class="linklike" type="button" (click)="go(1)">Enter the year on the Home step</button></p>
+        }
 
         <div class="next no-print">
           <a class="btn primary" routerLink="/quote">Find installers to quote</a>
@@ -793,8 +839,8 @@
         <div><dt>Panels</dt><dd class="num">{{ cfg().panels }} ({{ r().kwp | number: '1.1-1' }} kWp)</dd></div>
         <div><dt>Battery</dt><dd class="num">{{ cfg().batteryKwh ? cfg().batteryKwh + ' kWh' : 'None' }}</dd></div>
         <div><dt>Installed</dt><dd class="num">{{ eur0(r().grossCost) }}</dd></div>
-        <div><dt>SEAI solar grant</dt><dd class="num">{{ r().grant ? '-' + eur0(r().grant) : 'None' }}</dd></div>
-        @if (cfg().batteryKwh) { <div><dt>SEAI battery grant</dt><dd class="num">{{ r().batteryGrant ? '-' + eur0(r().batteryGrant) : 'None' }}</dd></div> }
+        <div><dt>SEAI solar grant</dt><dd class="num">{{ r().grant ? '-' + eur0(r().grant) : (grantsPending() ? 'Not counted yet' : 'None') }}</dd></div>
+        @if (cfg().batteryKwh) { <div><dt>SEAI battery grant</dt><dd class="num">{{ r().batteryGrant ? '-' + eur0(r().batteryGrant) : (grantsPending() ? 'Not counted yet' : 'None') }}</dd></div> }
         <div class="tot"><dt>You pay</dt><dd class="num">{{ eur0(r().netCost) }}</dd></div>
         <div><dt>Bill saving a year</dt><dd class="num">{{ eur0(r().billSaving) }}</dd></div>
         <div><dt>Export income a year</dt><dd class="num">{{ eur0(r().exportIncome) }}</dd></div>

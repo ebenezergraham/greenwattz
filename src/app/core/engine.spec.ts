@@ -3,12 +3,12 @@ import {
   PRICES, priceAgeDays, pricesAreStale,
   Eligibility, grantEligibility,
   Assumptions, BATTERY_OPTIONS, BATTERY_PRODUCTS, BATTERY_SIZES, BATTERY_TIERS, BatteryTier, batteryPrice, batteryTierInfo, BandMonthly, bandHours, medianFromBands, profileFromBands, Band, Tariff, bandBreakdown, bandOf, bandsOfDay, blendedRate, dayStats, rateFor, BEST_MAX_GEN_RATIO, CONNECTION_LIMIT_KW, HOUSE_TYPES, ROOF_TYPES, STOREY_ACCESS, roofTypeInfo, DEFAULT_ASSUMPTIONS as A, HomeInputs, MONTH_DAYS, NO_OBSTACLES, Usage,
-  annualFromBill, annualFromProfile, averageDay, buildGrid, cashflow, DEFAULT_GOALS, Goals, EXPORT_PRESETS, ratePreset, RATE_PRESETS, inverterLimitKw, loanPayment, paybackRange, exportTaxFor, EXPORT_TAX_RATES, LIFETIME, paybackFrom, project, connectionLimitPanels, costBreakdown, estimateProfile,
+  annualFromBill, annualFromProfile, averageDay, buildGrid, cashflow, batteryZones, sizeForZones, ZONES, DEFAULT_GOALS, Goals, mixWarnings, EXPORT_PRESETS, ratePreset, RATE_PRESETS, inverterLimitKw, loanPayment, paybackRange, exportTaxFor, EXPORT_TAX_RATES, LIFETIME, paybackFrom, project, connectionLimitPanels, costBreakdown, estimateProfile,
   maxPanels, obstacleArea, orientationFactor, pickStrategies, roofFitPanels, seaiGrantFor, shadingFactor, simulate, solarDay,
   splitUsage, systemCost, usableArea, withExtras,
 } from './engine';
 
-const HOME: HomeInputs = { houseType: 'semi', roofType: 'pitched', storeys: 2, taxpayers: 1, yearOccupied: null, occupancy: 'mixed', orientation: 'S', shading: 'none', roofAreaM2: 30, obstacles: { ...NO_OBSTACLES }, threePhase: false, addEv: false, addHeatPump: false };
+const HOME: HomeInputs = { houseType: 'semi', roofType: 'pitched', storeys: 2, taxpayers: 1, yearOccupied: 2000, occupancy: 'mixed', orientation: 'S', shading: 'none', roofAreaM2: 30, obstacles: { ...NO_OBSTACLES }, threePhase: false, addEv: false, addHeatPump: false };
 const home = (p: Partial<HomeInputs> = {}): HomeInputs => ({ ...HOME, ...p, obstacles: { ...NO_OBSTACLES, ...(p.obstacles ?? {}) } });
 const usage = (kwh = 4200, occ: HomeInputs['occupancy'] = 'mixed'): Usage => ({ annualKwh: kwh, profile: estimateProfile(kwh, occ), source: 'estimate' });
 const assump = (p: Partial<Assumptions> = {}): Assumptions => ({ ...A, ...p });
@@ -899,10 +899,14 @@ describe('SEAI grant eligibility by year occupied', () => {
     expect(no.grossCost).toBe(ok.grossCost);
     expect(no.paybackYears).toBeGreaterThan(ok.paybackYears);
   });
-  it('assumes the grants apply while the year is unknown, so the user sees the typical case', () => {
+  it('counts no grants until the year is known, so nothing is allocated before eligibility is confirmed', () => {
     const unknown = run(null), ok = run(1998);
-    expect(unknown.grant).toBe(ok.grant);
-    expect(unknown.batteryGrant).toBe(ok.batteryGrant);
+    expect(unknown.grant).toBe(0);
+    expect(unknown.batteryGrant).toBe(0);
+    expect(unknown.netCost).toBe(unknown.grossCost);
+    expect(ok.grant).toBeGreaterThan(0);
+    expect(ok.batteryGrant).toBeGreaterThan(0);
+    expect(unknown.netCost).toBeGreaterThan(ok.netCost);
   });
   it('only gives the battery grant for batteries of 5 kWh or more', () => {
     expect(run(1998, 0).batteryGrant).toBe(0);
@@ -1200,5 +1204,102 @@ describe('sizing from goals, not from the roof', () => {
     const s = pickStrategies(buildGrid(usage(), home(), A));
     expect(s.map((x) => x.key)).toEqual(['lean', 'best', 'bold']);
     expect(s[1].label).toBe('Right size');
+  });
+});
+
+describe('leaning the mix towards solar or battery', () => {
+  const pickFor = (lean: 'solar' | 'balanced' | 'battery', cover = 0.5) =>
+    pickStrategies(buildGrid(usage(), { ...home(), roofAreaM2: 110, threePhase: true }, A), false, { cover, exportIncome: 0, lean })[1];
+  it('meets the goal whichever way it leans', () => {
+    for (const l of ['solar', 'balanced', 'battery'] as const) expect(pickFor(l).selfSufficiency).toBeGreaterThanOrEqual(0.5);
+  });
+  it('uses no more battery for "more solar" than the balanced mix', () => {
+    expect(pickFor('solar').batteryKwh).toBeLessThanOrEqual(pickFor('balanced').batteryKwh);
+  });
+  it('uses no more panels for "more battery" than the balanced mix', () => {
+    expect(pickFor('battery').panels).toBeLessThanOrEqual(pickFor('balanced').panels);
+  });
+  it('costs no less than the balanced mix, which is the cheapest', () => {
+    expect(pickFor('solar').netCost).toBeGreaterThanOrEqual(pickFor('balanced').netCost - 1e-6);
+    expect(pickFor('battery').netCost).toBeGreaterThanOrEqual(pickFor('balanced').netCost - 1e-6);
+  });
+  it('changes the mix between the two extremes', () => {
+    const s = pickFor('solar', 0.6), b = pickFor('battery', 0.6);
+    expect(s.panels * 100 + (20 - s.batteryKwh)).toBeGreaterThanOrEqual(b.panels * 100 + (20 - b.batteryKwh));
+  });
+});
+
+describe('warnings for a badly matched mix', () => {
+  const run = (panels: number, kwh: number, a: Partial<typeof A> = {}) => { const aa = { ...A, ...a }; return { r: simulate(usage(), home(), aa, { panels, batteryKwh: kwh }), a: aa }; };
+  it('flags a battery that a typical day barely uses', () => {
+    const { r, a } = run(4, 20);
+    expect(mixWarnings(r, a).map((n) => n.kind)).toContain('battery-unused');
+  });
+  it('does not flag a well-used battery', () => {
+    const { r, a } = run(12, 5);
+    expect(mixWarnings(r, a).map((n) => n.kind)).not.toContain('battery-unused');
+  });
+  it('flags panels whose power is mostly exported when no export is wanted', () => {
+    const { r, a } = run(20, 0);
+    expect(mixWarnings(r, a, 0).map((n) => n.kind)).toContain('mostly-exported');
+  });
+  it('stays quiet about exports when the household wants export income', () => {
+    const { r, a } = run(20, 0);
+    expect(mixWarnings(r, a, 600).map((n) => n.kind)).not.toContain('mostly-exported');
+  });
+  it('has nothing to say with no panels', () => {
+    const { r, a } = run(0, 0);
+    expect(mixWarnings(r, a)).toEqual([]);
+  });
+});
+
+describe('battery size for chosen times of day', () => {
+  const z = batteryZones(usage(), home(), A, 12);
+  const by = (k: string) => z.zones.find((x) => x.key === k)!;
+  it('covers every hour once across night, peak and day', () => {
+    const hours = ZONES.flatMap((x) => x.hours).sort((a, b) => a - b);
+    expect(hours).toEqual(Array.from({ length: 24 }, (_, h) => h));
+  });
+  it('needs almost all of the household night use, because panels make little then', () => {
+    const u = usage();
+    const nightLoad = ZONES[0].hours.reduce((s, h) => s + u.profile.reduce((t, m, i) => t + m[h] * MONTH_DAYS[i], 0) / 365, 0);
+    expect(batteryZones(usage(), home(), A, 0).zones[0].average).toBeCloseTo(nightLoad, 6);
+    expect(by('night').average).toBeLessThanOrEqual(nightLoad + 1e-9);
+    expect(by('night').average).toBeGreaterThan(nightLoad * 0.7); // only a little summer morning sun at the edges
+  });
+  it('needs less for the day once panels cover the sunny hours', () => {
+    const none = batteryZones(usage(), home(), A, 0);
+    expect(by('day').average).toBeLessThan(none.zones.find((x) => x.key === 'day')!.average);
+  });
+  it('needs more in winter than in summer', () => {
+    expect(by('night').winter).toBeGreaterThan(by('night').summer);
+  });
+  it('recommends a larger battery as more times of day are chosen', () => {
+    const a = sizeForZones(z, ['night']), b = sizeForZones(z, ['night', 'peak']), c = sizeForZones(z, ['night', 'peak', 'day']);
+    expect(b.needKwh).toBeGreaterThan(a.needKwh);
+    expect(c.needKwh).toBeGreaterThan(b.needKwh);
+    expect(c.size).toBeGreaterThanOrEqual(b.size);
+    expect(b.size).toBeGreaterThanOrEqual(a.size);
+  });
+  it('picks a standard size big enough after the 10% reserve', () => {
+    const r = sizeForZones(z, ['night', 'peak']);
+    expect(BATTERY_SIZES).toContain(r.size);
+    if (!r.tooBig) expect(r.size).toBeGreaterThanOrEqual(r.nominalKwh);
+    expect(r.nominalKwh).toBeCloseTo(r.needKwh / 0.9, 9);
+  });
+  it('recommends nothing when no time of day is chosen', () => {
+    const r = sizeForZones(z, []);
+    expect(r.size).toBe(0);
+    expect(r.needKwh).toBe(0);
+  });
+  it('flags a need bigger than any single battery', () => {
+    const big = batteryZones(usage(30000), home(), A, 12);
+    expect(sizeForZones(big, ['night', 'peak', 'day']).tooBig).toBe(true);
+  });
+  it('says how much of the need the solar surplus can charge, and less in winter', () => {
+    const r = sizeForZones(z, ['night', 'peak']);
+    expect(r.chargedAverage).toBeGreaterThan(0);
+    expect(r.chargedAverage).toBeLessThanOrEqual(1);
+    expect(r.chargedWinter).toBeLessThanOrEqual(r.chargedAverage);
   });
 });

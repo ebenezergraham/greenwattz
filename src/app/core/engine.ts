@@ -748,8 +748,9 @@ export function simulate(usage: Usage, home: HomeInputs, a: Assumptions, cfg: Co
   const grossLow = breakdown.reduce((t, r) => t + r.low, 0);
   const grossHigh = breakdown.reduce((t, r) => t + r.high, 0);
   const elig = grantEligibility(home);
-  const grant = a.seaiGrant && kwp > 0 && elig.solar !== 'ineligible' ? seaiGrantFor(kwp) : 0;
-  const batteryGrant = a.seaiBatteryGrant && cap >= PRICES.grants.seaiBatteryMinKwh && kwp > 0 && elig.battery !== 'ineligible' ? PRICES.grants.seaiBattery : 0;
+  // Grants are counted only once the year the home was first occupied is known and qualifies.
+  const grant = a.seaiGrant && kwp > 0 && elig.solar === 'eligible' ? seaiGrantFor(kwp) : 0;
+  const batteryGrant = a.seaiBatteryGrant && cap >= PRICES.grants.seaiBatteryMinKwh && kwp > 0 && elig.battery === 'eligible' ? PRICES.grants.seaiBattery : 0;
   const net = Math.max(0, gross - grant - batteryGrant);
   const saving = billBefore - billAfter;
   const exportTaxFree = a.exportTaxFreePerPerson * home.taxpayers;
@@ -813,8 +814,9 @@ export const BEST_MAX_GEN_RATIO = 1.25;
 export const BOLD_MAX_GEN_RATIO = 1.5;
 
 /** What the household wants from the system: the share of its own use covered, and the export income it hopes for. */
-export interface Goals { cover: number; exportIncome: number }
-export const DEFAULT_GOALS: Goals = { cover: 0.6, exportIncome: 0 };
+export type Lean = 'solar' | 'balanced' | 'battery';
+export interface Goals { cover: number; exportIncome: number; /** Which way to tip the mix when several meet the goals. Balanced picks the cheapest. */ lean?: Lean }
+export const DEFAULT_GOALS: Goals = { cover: 0.6, exportIncome: 0, lean: 'balanced' };
 
 export function pickStrategies(grid: Result[], exportExtra = false, goals: Goals = DEFAULT_GOALS): Scenario[] {
   const value = (r: Result) => r.netGain;
@@ -834,8 +836,15 @@ export function pickStrategies(grid: Result[], exportExtra = false, goals: Goals
   const candidates = goals.exportIncome > 0 ? pool : within(BEST_MAX_GEN_RATIO);
   const hits = candidates.filter(meets);
   const progress = (r: Result) => Math.min(1, r.selfSufficiency / Math.max(goals.cover, 1e-9)) + (goals.exportIncome > 0 ? Math.min(1, r.exportIncome / goals.exportIncome) : 0);
+  // Among the systems that meet the goals: balanced is the cheapest, "more solar" uses the least battery, and
+  // "more battery" uses the fewest panels, with cost breaking ties.
+  const order = (x: Result, y: Result) => goals.lean === 'solar'
+    ? x.batteryKwh - y.batteryKwh || x.netCost - y.netCost
+    : goals.lean === 'battery'
+      ? x.panels - y.panels || x.netCost - y.netCost
+      : x.netCost - y.netCost || value(y) - value(x);
   const best = hits.length
-    ? [...hits].sort((x, y) => x.netCost - y.netCost || value(y) - value(x))[0]
+    ? [...hits].sort(order)[0]
     : [...candidates].sort((x, y) => progress(y) - progress(x) || x.netCost - y.netCost)[0];
   const bold = [...within(BOLD_MAX_GEN_RATIO)].sort((x, y) => y.selfSufficiency - x.selfSufficiency || value(y) - value(x))
     .filter((r) => value(r) > -0.2 * r.netCost)[0] ?? best;
@@ -845,6 +854,87 @@ export function pickStrategies(grid: Result[], exportExtra = false, goals: Goals
     mk(best, 'best', 'Right size', hits.length ? 'Smallest system that meets your coverage and export goals.' : 'Gets closest to your goals within your roof and connection.', hits.length > 0),
     mk(bold, 'bold', 'Most independent', 'Covers as much of your usage as sensible.'),
   ];
+}
+
+export interface MixNote { kind: 'battery-unused' | 'mostly-exported'; text: string }
+
+/**
+ * Plain-English warnings when panels and battery are badly matched. A battery is judged by how much of its usable
+ * capacity a typical day actually uses; panels by how much of their output is exported rather than used.
+ */
+export function mixWarnings(r: Result, a: Assumptions, exportGoal = 0): MixNote[] {
+  const notes: MixNote[] = [];
+  if (r.kwp <= 0) return notes;
+  if (r.batteryKwh > 0) {
+    const usable = r.batteryKwh * 0.9;
+    const use = r.supply.battery / (usable * 365);
+    if (use < 0.5) notes.push({ kind: 'battery-unused', text: `A typical day uses only about ${Math.round(use * 100)}% of this ${r.batteryKwh} kWh battery, so it rarely fills. A smaller battery or more panels would use it better.` });
+  }
+  const exportShare = r.generationKwh > 0 ? r.exportKwh / r.generationKwh : 0;
+  if (exportShare > 0.6 && exportGoal <= 0) notes.push({ kind: 'mostly-exported', text: `About ${Math.round(exportShare * 100)}% of what these panels make is exported at ${Math.round(a.exportRate * 100)}c instead of used at home. Fewer panels, or a battery to hold the surplus, would use more of it yourself.` });
+  return notes;
+}
+
+export type ZoneKey = 'night' | 'peak' | 'day';
+
+export const ZONES: { key: ZoneKey; label: string; when: string; hours: number[] }[] = [
+  { key: 'night', label: 'Night', when: '11pm to 8am', hours: [23, 0, 1, 2, 3, 4, 5, 6, 7] },
+  { key: 'peak', label: 'Peak', when: '5pm to 7pm', hours: [17, 18] },
+  { key: 'day', label: 'Day', when: '8am to 5pm and 7pm to 11pm', hours: [8, 9, 10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22] },
+];
+
+export interface ZoneNeed { key: ZoneKey; label: string; when: string; average: number; winter: number; summer: number }
+export interface BatteryZones {
+  zones: ZoneNeed[];
+  /** Solar left after the house has used what it needs, per day, that could charge a battery. */
+  surplusAverage: number;
+  surplusWinter: number;
+}
+
+/**
+ * What a battery would have to supply in each time of day, in kWh a day: the household's use in those hours less
+ * what the panels cover directly at the same time. Averaged over the year, with December and June for the extremes.
+ */
+export function batteryZones(usage: Usage, home: HomeInputs, a: Assumptions, panels: number): BatteryZones {
+  const gen = Array.from({ length: 12 }, (_, m) => (panels > 0 ? solarDay(home, a, panels, m) : new Array(24).fill(0)));
+  const total = MONTH_DAYS.reduce((s, d) => s + d, 0);
+  const need = (m: number, hours: number[]) => hours.reduce((s, h) => s + Math.max(0, usage.profile[m][h] - gen[m][h]), 0);
+  const zones = ZONES.map((z) => ({
+    key: z.key, label: z.label, when: z.when,
+    average: MONTH_DAYS.reduce((s, d, m) => s + need(m, z.hours) * d, 0) / total,
+    winter: need(11, z.hours), summer: need(5, z.hours),
+  }));
+  const surplus = (m: number) => gen[m].reduce((s, g, h) => s + Math.max(0, g - usage.profile[m][h]), 0);
+  return { zones, surplusAverage: MONTH_DAYS.reduce((s, d, m) => s + surplus(m) * d, 0) / total, surplusWinter: surplus(11) };
+}
+
+export interface ZoneSize {
+  /** Usable kWh the chosen times need on an average day. */
+  needKwh: number;
+  /** Nominal kWh to buy, after the 10% reserve. */
+  nominalKwh: number;
+  /** The smallest standard size that covers it, or the largest standard size when none is big enough. */
+  size: number;
+  tooBig: boolean;
+  /** Share of the need a day of solar surplus could charge on average, and in December. */
+  chargedAverage: number;
+  chargedWinter: number;
+}
+
+/** Recommends a battery size for the times of day the household wants covered. */
+export function sizeForZones(z: BatteryZones, selected: ZoneKey[]): ZoneSize {
+  const chosen = z.zones.filter((x) => selected.includes(x.key));
+  const needKwh = chosen.reduce((s, x) => s + x.average, 0);
+  const nominalKwh = needKwh / 0.9; // 10% is kept in reserve
+  const fit = BATTERY_SIZES.find((s) => s >= nominalKwh);
+  const winterNeed = chosen.reduce((s, x) => s + x.winter, 0);
+  return {
+    needKwh, nominalKwh,
+    size: needKwh <= 0 ? 0 : fit ?? BATTERY_SIZES[BATTERY_SIZES.length - 1],
+    tooBig: needKwh > 0 && fit === undefined,
+    chargedAverage: needKwh > 0 ? Math.min(1, (z.surplusAverage * 0.9) / needKwh) : 1,
+    chargedWinter: winterNeed > 0 ? Math.min(1, (z.surplusWinter * 0.9) / winterNeed) : 1,
+  };
 }
 
 export interface Cashflow {

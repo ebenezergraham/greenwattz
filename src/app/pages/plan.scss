@@ -167,3 +167,7 @@ input.short { max-width: 200px; }
 .presets { display: grid; gap: 6px; margin: 12px 0; .pl { display: block; margin-top: 4px; } }
 .goals { margin: 18px 0 6px; h2 { font-size: 1.15rem; } .ok { font-weight: 600; margin: 8px 0 0; i { color: var(--link); } }
 }
+
+.seg.zones { margin: 8px 0; flex-wrap: wrap; button { display: inline-flex; gap: 6px; align-items: baseline; } }
+.cmp.zn .cmp-head, .cmp.zn .cmp-row { grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 1fr)); }
+@media (max-width: 760px) { .cmp.zn .cmp-row { grid-template-columns: repeat(3, minmax(0, 1fr)); .nm { grid-column: 1 / -1; } } }

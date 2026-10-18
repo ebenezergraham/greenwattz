@@ -33,7 +33,7 @@ import { DayChart } from '../ui/charts';
           </div>
           <p class="sum num">
             {{ best().panels }} panels ({{ best().kwp | number: '1.1-1' }} kWp) cost about €{{ round50(best().grossCost) | number }}.
-            Less the €{{ round50(best().grant) | number }} SEAI grant, you pay <strong>€{{ round50(best().netCost) | number }}</strong>
+            Less the €{{ round50(best().grant) | number }} SEAI grant for homes first occupied before {{ grants.seaiSolarBuiltBefore }}, you pay <strong>€{{ round50(best().netCost) | number }}</strong>
             and it pays back in about <strong>{{ best().paybackYears | number: '1.0-0' }} years</strong>.
           </p>
           <a class="refine" routerLink="/plan">Refine this for my home</a>
@@ -137,7 +137,7 @@ export class HomePage {
   readonly grants = PRICES.grants;
   readonly kwh = signal(4200);
   private home: HomeInputs = {
-    houseType: 'semi', roofType: 'pitched', storeys: 2, taxpayers: 1, yearOccupied: null, occupancy: 'mixed', orientation: 'S',
+    houseType: 'semi', roofType: 'pitched', storeys: 2, taxpayers: 1, yearOccupied: 2000, occupancy: 'mixed', orientation: 'S',
     shading: 'none', roofAreaM2: 30, obstacles: { ...NO_OBSTACLES }, threePhase: false, addEv: false, addHeatPump: false,
   };
   readonly best = computed(() => {

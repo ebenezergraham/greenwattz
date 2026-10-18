@@ -4,7 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
 import { PlanStore } from '../core/store';
-import { Assumptions, EXPORT_PRESETS, RATE_PRESETS, RatePresetKey, ratePreset, inverterLimitKw, siteOrientationFactor, shadingFactor, roofTypeInfo, BATTERY_PRODUCTS, BATTERY_SIZES, loanPayment, paybackRange, EXPORT_TAX_RATES, exportTaxFor, PRICES, grantEligibility, seaiGrantFor, BATTERY_GUIDE, BATTERY_OPTIONS, BATTERY_TIERS, BatteryTier, batteryPrice, HOUSE_TYPES, HouseType, OBSTACLES, ObstacleKey, ROOF_TYPES, RoofType, Storeys, Orientation, Occupancy, Shading, Scenario, Tariff, bandsOfDay, simulate, solarDay } from '../core/engine';
+import { Assumptions, ZoneKey, batteryZones, sizeForZones, Lean, mixWarnings, EXPORT_PRESETS, RATE_PRESETS, RatePresetKey, ratePreset, inverterLimitKw, siteOrientationFactor, shadingFactor, roofTypeInfo, BATTERY_PRODUCTS, BATTERY_SIZES, loanPayment, paybackRange, EXPORT_TAX_RATES, exportTaxFor, PRICES, grantEligibility, seaiGrantFor, BATTERY_GUIDE, BATTERY_OPTIONS, BATTERY_TIERS, BatteryTier, batteryPrice, HOUSE_TYPES, HouseType, OBSTACLES, ObstacleKey, ROOF_TYPES, RoofType, Storeys, Orientation, Occupancy, Shading, Scenario, Tariff, bandsOfDay, simulate, solarDay } from '../core/engine';
 import { HdfError, parseHdf } from '../core/hdf';
 import { inferHousehold } from '../core/infer';
 import { CashChart, DayChart, Legend, MonthChart } from '../ui/charts';
@@ -48,6 +48,12 @@ export class PlanPage {
       sunny: this.s.dayStats().sunnyHoursPct,
     };
   });
+  /** Times of day the user wants the battery to cover. */
+  readonly zoneSel = signal<ZoneKey[]>(['night', 'peak']);
+  readonly zoneInfo = computed(() => batteryZones(this.s.usage(), this.s.home(), this.s.assumptions(), this.r().panels));
+  readonly zoneSize = computed(() => sizeForZones(this.zoneInfo(), this.zoneSel()));
+  toggleZone(k: ZoneKey) { this.zoneSel.update((s) => (s.includes(k) ? s.filter((x) => x !== k) : [...s, k])); }
+  useZoneSize() { const z = this.zoneSize(); if (z.size > 0) this.setBattery(z.size); }
   readonly bandNames: Record<string, string> = { flat: 'All day', night: 'Night (11pm to 8am)', day: 'Day', peak: 'Peak (5pm to 7pm)' };
   /** Yearly electricity by source, as shares of what the home uses. */
   readonly sources = computed(() => {
@@ -63,8 +69,23 @@ export class PlanPage {
     return { demand, rows: rows.map((x) => ({ ...x, share: x.kwh / demand })) };
   });
   inverterKw() { return inverterLimitKw(this.s.home()); }
-  setCover(e: Event) { this.s.chosen.set(null); this.s.goals.update((g) => ({ ...g, cover: this.num(e) / 100 })); }
-  setExportGoal(v: number) { this.s.chosen.set(null); this.s.goals.update((g) => ({ ...g, exportIncome: v })); }
+  // Changing a goal keeps any mix the user has tuned; the status line below says whether it still meets the goals.
+  setCover(e: Event) { this.s.goals.update((g) => ({ ...g, cover: this.num(e) / 100 })); }
+  setExportGoal(v: number) { this.s.goals.update((g) => ({ ...g, exportIncome: v })); }
+  readonly leans: { key: Lean; label: string; hint: string }[] = [
+    { key: 'solar', label: 'More solar', hint: 'Fewest battery kWh that still meet your goals, so more of the work is done by panels.' },
+    { key: 'balanced', label: 'Balanced', hint: 'The cheapest mix that meets your goals.' },
+    { key: 'battery', label: 'More battery', hint: 'Fewest panels that meet your goals, with the battery filling the gap.' },
+  ];
+  setLean(l: Lean) { this.s.chosen.set(null); this.s.goals.update((g) => ({ ...g, lean: l })); }
+  leanHint(): string { return this.leans.find((l) => l.key === (this.s.goals().lean ?? 'balanced'))!.hint; }
+  /** Whether the mix currently shown meets the goals, as opposed to the recommended one. */
+  readonly mixStatus = computed(() => {
+    const r = this.r(), g = this.s.goals();
+    return { cover: r.selfSufficiency, exportIncome: r.exportIncome, meetsCover: r.selfSufficiency >= g.cover - 1e-9, meetsExport: r.exportIncome >= g.exportIncome - 1e-9, custom: this.s.chosen() !== null };
+  });
+  readonly mixNotes = computed(() => mixWarnings(this.r(), this.s.assumptions(), this.s.goals().exportIncome));
+  resetMix() { this.s.chosen.set(null); }
   readonly exportGoals = [0, 600, 1200];
   setExportExtra(on: boolean) { this.s.chosen.set(null); this.s.patchAssumptions({ exportExtra: on }); }
   setWatts(e: Event) {
@@ -153,7 +174,7 @@ export class PlanPage {
   }
   readonly yearHint = computed(() => {
     const y = this.s.home().yearOccupied, e = this.elig(), cut = PRICES.grants.seaiSolarBuiltBefore;
-    if (y == null || !e.yearValid) return `SEAI's solar and battery grants need a home built and occupied before ${cut}. Enter the year to check. Until then we assume you qualify.`;
+    if (y == null || !e.yearValid) return `SEAI's solar and battery grants need a home built and occupied before ${cut}. Enter the year to check. Until you do, no grant is counted in your costs.`;
     return e.solar === 'eligible'
       ? `Occupied before ${cut}, so the home meets SEAI's age rule for the solar and battery grants.`
       : `Homes first occupied in ${cut} or later are not eligible for SEAI's solar or battery grants, so we have taken both off your costs.`;
@@ -164,18 +185,27 @@ export class PlanPage {
     const unknown = e.solar === 'unknown';
     const solar = !a.seaiGrant ? 'You switched this grant off in the assumptions.'
       : e.solar === 'ineligible' ? `Not eligible: first occupied in ${this.s.home().yearOccupied}, after the ${cut} cut-off.`
-      : unknown ? 'Assumed eligible. Enter the year your home was first occupied on the Home step to check.'
+      : unknown ? 'Not counted yet. Enter the year your home was first occupied on the Home step to check.'
       : 'Eligible on age. Other conditions below also apply.';
     const hasBattery = this.cfg().batteryKwh > 0;
     const battery = e.battery === 'ineligible' ? `Not eligible: first occupied in ${this.s.home().yearOccupied}, after the ${cut} cut-off.`
       : !hasBattery ? `No battery in this plan. A battery of ${g.seaiBatteryMinKwh} kWh or more would qualify.`
       : !a.seaiBatteryGrant ? 'You switched this grant off in the assumptions.'
-      : unknown ? 'Assumed eligible. Enter the year your home was first occupied on the Home step to check.'
+      : unknown ? 'Not counted yet. Enter the year your home was first occupied on the Home step to check.'
       : 'Eligible on age. Other conditions below also apply.';
     return {
-      solar: { text: solar, amount: r.grant ? this.eur(r.grant) : (e.solar === 'ineligible' || !a.seaiGrant ? 'Not applied' : this.eur(seaiGrantFor(r.kwp))) },
-      battery: { text: battery, amount: r.batteryGrant ? this.eur(r.batteryGrant) : 'Not applied' },
+      solar: { text: solar, amount: r.grant ? this.eur(r.grant) : (e.solar === 'unknown' && a.seaiGrant ? 'Up to ' + this.eur(seaiGrantFor(r.kwp)) + ' if eligible' : 'Not applied') },
+      battery: { text: battery, amount: r.batteryGrant ? this.eur(r.batteryGrant) : (unknown && hasBattery && a.seaiBatteryGrant && this.cfg().batteryKwh >= g.seaiBatteryMinKwh ? 'Up to ' + this.eur(g.seaiBattery) + ' if eligible' : 'Not applied') },
     };
+  });
+  /** True while the year is unknown, so no grant is counted and the plan costs are before any grant. */
+  readonly grantsPending = computed(() => this.elig().solar === 'unknown');
+  /** The most the grants could take off if the home qualifies, shown while they are not counted. */
+  readonly grantsPossible = computed(() => {
+    const r = this.r(), a = this.s.assumptions();
+    const solar = a.seaiGrant && r.kwp > 0 ? seaiGrantFor(r.kwp) : 0;
+    const battery = a.seaiBatteryGrant && r.batteryKwh >= PRICES.grants.seaiBatteryMinKwh ? PRICES.grants.seaiBattery : 0;
+    return { solar, battery, total: solar + battery };
   });
   setPayers(n: 1 | 2) { this.s.patchHome({ taxpayers: n }); }
   readonly payersHint = computed(() => {
