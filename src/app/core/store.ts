@@ -1,7 +1,7 @@
 import { inferHousehold } from './infer';
 import { Injectable, computed, signal } from '@angular/core';
 import {
-  Assumptions, Config, DEFAULT_ASSUMPTIONS, averageDay, medianFromBands, profileFromBands, bandBreakdown, dayStats, HOUSE_TYPES, HomeInputs, HouseType, NO_OBSTACLES, ObstacleKey, usableArea, obstacleArea, Usage, annualFromBill, buildGrid, cashflow,
+  Assumptions, Config, PRICES, DEFAULT_ASSUMPTIONS, averageDay, medianFromBands, profileFromBands, bandBreakdown, dayStats, HOUSE_TYPES, HomeInputs, HouseType, NO_OBSTACLES, ObstacleKey, usableArea, obstacleArea, Usage, annualFromBill, buildGrid, cashflow,
   estimateProfile, maxPanels, roofFitPanels, connectionLimitPanels, pickStrategies, DEFAULT_GOALS, Goals, simulate, withExtras,
 } from './engine';
 
@@ -16,7 +16,7 @@ export class PlanStore {
   });
   readonly assumptions = signal<Assumptions>({ ...DEFAULT_ASSUMPTIONS });
   readonly mode = signal<UsageMode>('annual');
-  readonly annualKwh = signal(4200);
+  readonly annualKwh = signal(PRICES.usage.typicalHomeKwh);
   readonly monthlyBill = signal(140);
   readonly meterUsage = signal<Usage | null>(null);
   readonly chosen = signal<Config | null>(null);

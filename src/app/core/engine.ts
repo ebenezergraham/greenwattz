@@ -5,16 +5,24 @@
  */
 
 import prices from '../data/prices.json';
+import batteryProducts from '../data/battery-products.json';
 
 export interface PriceSource { what: string; label: string; url: string }
+export interface CostRowData { key: string; label: string; note: string; group: 'solar' | 'battery'; perKwpEuro?: number; baseEuro?: number; lo: number; hi: number }
+export interface CostBreakdownData { note: string; referencePerKwp: number; referenceBase: number; rows: CostRowData[] }
 export interface PriceData {
   reviewedOn: string;
   reviewEveryDays: number;
-  solar: { costBase: number; costPerKwp: number; yieldPerKwp: number; note: string };
+  solar: { costBase: number; costPerKwp: number; yieldPerKwp: number; panelWatts: number; panelAreaM2: number; note: string; costBreakdown: CostBreakdownData };
   grants: { seaiSolarFirst2kwpPerKwp: number; seaiSolarNext2kwpPerKwp: number; seaiSolarMax: number; seaiBattery: number; seaiBatteryConfirmed: boolean; seaiSolarBuiltBefore: number; seaiBatteryBuiltBefore: number; seaiBatteryMinKwh: number; seaiBatteryOpened: string; seaiEnhancedMax: number };
   links: { solarGrant: string; batteryGrant: string; enhanced: string; howToApply: string; installers: string; terms: string; govEnergyUpgrades: string };
-  tax: { exportExemptionPerPerson: number; exportExemptionInForcePerPerson: number; exportTaxRate: number; note: string };
-  tariffs: { flat: number; day: number; night: number; peak: number; export: number; exportPremium: number; standingChargeMonthly: number };
+  tax: { exportExemptionPerPerson: number; exportExemptionInForcePerPerson: number; exportTaxRate: number; exportTaxRateHigher: number; note: string };
+  tariffs: { flat: number; day: number; night: number; peak: number; export: number; exportPremium: number; standingChargeMonthly: number; vat: number; priceRiseYearly: number; billExample: { dayExVat: number; nightExVat: number; peakExVat: number; discount: number; note: string } };
+  connection: { singlePhaseKw: number; threePhaseKw: number; note: string };
+  batterySpec: { sizes: number[]; roundTripEfficiency: number; reserveShare: number; unitShareOfInstalled: number; note: string };
+  lifetime: { years: number; panelAgeingPerYear: number; inverterYear: number; inverterCostShare: number; batteryYear: number; batteryCostShare: number; note: string };
+  usage: { typicalHomeKwh: number; evKwhPerYear: number; heatPumpKwhPerYear: number; note: string };
+  emissions: { co2KgPerKwh: number; note: string };
   battery: Record<'value' | 'mainstream' | 'premium', { kwh: number; low: number; high: number }[]>;
   sources: PriceSource[];
 }
@@ -98,23 +106,13 @@ export function batteryPrice(tier: BatteryTier, kwh: number): { low: number; mid
  * Battery sizes the planner tests, from the module and pack sizes the main brands sell (see BATTERY_PRODUCTS).
  * Real products are nominal capacity; ask each installer for usable kWh.
  */
-export const BATTERY_SIZES = [5, 7, 8, 10, 13.5, 15, 20];
+export const BATTERY_SIZES: number[] = PRICES.batterySpec.sizes;
+
+/** Share of a battery's nominal capacity the planner treats as usable; the rest is kept in reserve. */
+export const BATTERY_USABLE_SHARE = 1 - PRICES.batterySpec.reserveShare;
 
 /** What each common brand sells, from manufacturer product ranges. Nominal kWh, so usable capacity is a little lower. */
-export const BATTERY_PRODUCTS: { brand: string; tier: BatteryTier; sizes: string; note: string }[] = [
-  { brand: 'Huawei LUNA2000', tier: 'mainstream', sizes: '5, 7, 10, 14, 15, 21 kWh', note: 'Modular packs of 5, 7 or 10 kWh stacked up to three high.' },
-  { brand: 'GivEnergy', tier: 'value', sizes: '2.6, 5.2, 8.2, 9.5, 13.5 kWh', note: 'Single units and an all-in-one; larger systems stack several.' },
-  { brand: 'Sungrow SBR', tier: 'mainstream', sizes: '9.6, 12.8, 16, 19.2, 22.4, 25.6 kWh', note: 'Built in 3.2 kWh modules, usually from 9.6 kWh up.' },
-  { brand: 'Tesla Powerwall 3', tier: 'premium', sizes: '13.5 kWh', note: 'One size, with the inverter built in.' },
-  { brand: 'Sigenergy SigenStor', tier: 'premium', sizes: '5, 8, 10, 13, 16, 20, 24, 30 kWh', note: 'Modules of 5 or 8 kWh, scalable in steps.' },
-  { brand: 'SolarEdge Home Battery', tier: 'premium', sizes: '4.6, 9.2, 13.8 kWh', note: 'Built from 4.6 kWh batteries, up to three together.' },
-  { brand: 'BYD Battery-Box HVS', tier: 'value', sizes: '5.1, 7.7, 10.2, 12.8 kWh', note: 'High-voltage stack in 2.56 kWh steps.' },
-  { brand: 'Fox ESS', tier: 'value', sizes: '4.7, 5.8, 8.3, 11.6, 16.6 kWh', note: 'EQ4800 and ECS ranges, stacked.' },
-  { brand: 'SolaX Triple Power', tier: 'value', sizes: '5.8, 11.6, 17.4 kWh', note: '5.8 kWh modules, stacked.' },
-  { brand: 'Enphase IQ Battery', tier: 'premium', sizes: '5, 10, 15 kWh', note: '5 kWh units, up to several together; works with Enphase microinverters.' },
-  { brand: 'myenergi Libbi', tier: 'mainstream', sizes: '5, 10, 15, 20 kWh', note: '5 kWh modules with its own inverter.' },
-  { brand: 'Pylontech and Dyness', tier: 'value', sizes: '3.5, 4.8, 5.1 kWh modules', note: 'Low-voltage modules, often stacked to 10 to 20 kWh.' },
-];
+export const BATTERY_PRODUCTS = batteryProducts.products as { brand: string; tier: BatteryTier; sizes: string; note: string }[];
 
 /** Rough guide to what size suits whom, drawn from installer sizing advice. */
 export const BATTERY_GUIDE: { kwh: string; who: string }[] = [
@@ -163,22 +161,22 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
   peakRate: PRICES.tariffs.peak,
   standingChargeMonthly: PRICES.tariffs.standingChargeMonthly,
   exportRate: PRICES.tariffs.export,
-  vat: 0.09,
-  tariffInflation: 0.02,
+  vat: PRICES.tariffs.vat,
+  tariffInflation: PRICES.tariffs.priceRiseYearly,
   yieldPerKwp: PRICES.solar.yieldPerKwp,
-  panelWatts: 465,
-  panelAreaM2: 2.0,
+  panelWatts: PRICES.solar.panelWatts,
+  panelAreaM2: PRICES.solar.panelAreaM2,
   panelCostBase: PRICES.solar.costBase,
   panelCostPerKwp: PRICES.solar.costPerKwp,
   batteryTier: 'mainstream',
-  batteryEfficiency: 0.9,
+  batteryEfficiency: PRICES.batterySpec.roundTripEfficiency,
   seaiGrant: true,
   exportExtra: false,
   gridCharge: false,
   seaiBatteryGrant: PRICES.grants.seaiBatteryConfirmed,
   exportTaxFreePerPerson: PRICES.tax.exportExemptionPerPerson,
   exportTaxRate: PRICES.tax.exportTaxRate,
-  co2KgPerKwh: 0.3,
+  co2KgPerKwh: PRICES.emissions.co2KgPerKwh,
 };
 
 export type ExportPresetKey = 'typical' | 'premium';
@@ -191,12 +189,13 @@ export const EXPORT_PRESETS: { key: ExportPresetKey; label: string; rate: number
 
 export type RatePresetKey = 'below' | 'typical' | 'above';
 
-/** Unit rates before VAT and the supplier discount, read from a real Irish bill (day 38.65c, night 21.25c, peak 43.4c). */
-const BILL_RATES_EX_VAT = { day: 0.3865, night: 0.2125, peak: 0.434 };
-const BILL_DISCOUNT = 0.32;
+/** Unit rates before VAT and the supplier discount, read from a real Irish bill. They live in prices.json under tariffs.billExample. */
+const BILL = PRICES.tariffs.billExample;
+const BILL_RATES_EX_VAT = { day: BILL.dayExVat, night: BILL.nightExVat, peak: BILL.peakExVat };
+const BILL_DISCOUNT = BILL.discount;
 
 export const RATE_PRESETS: { key: RatePresetKey; label: string; hint: string }[] = [
-  { key: 'below', label: 'Below typical', hint: 'A supplier plan with about a 32% discount on unit rates, as on a real bill.' },
+  { key: 'below', label: 'Below typical', hint: `A supplier plan with about a ${Math.round(BILL.discount * 100)}% discount on unit rates, as on a real bill.` },
   { key: 'typical', label: 'Typical', hint: 'An average day and night plan, from published rates.' },
   { key: 'above', label: 'Above typical', hint: 'Standard list rates with no discount, as on a real bill.' },
 ];
@@ -355,8 +354,8 @@ export function withExtras(u: Usage, home: HomeInputs): Usage {
     profile = profile.map((row, m) => row.map((v, h) => v + sh[h] * base * (seasonal ? DEMAND_SEASON[m] ** 2 : 1)));
     annual += kwh;
   };
-  if (home.addEv) add(2600, EV_SHAPE, false);
-  if (home.addHeatPump) add(3500, HP_SHAPE, true);
+  if (home.addEv) add(PRICES.usage.evKwhPerYear, EV_SHAPE, false);
+  if (home.addHeatPump) add(PRICES.usage.heatPumpKwhPerYear, HP_SHAPE, true);
   const out: Usage = { ...u, profile, annualKwh: annual };
   if (u.median) {
     // shift the median by the average extra load in each hour, so it still describes the new total
@@ -499,6 +498,19 @@ export function splitUsage(p: Profile): Split {
 export function siteOrientationFactor(h: HomeInputs): number {
   return h.roofType === 'flat' ? roofTypeInfo('flat').yield : orientationFactor(h.orientation);
 }
+/**
+ * The roof direction option that a compass bearing falls in. Bearing is the way the roof slope faces, in degrees
+ * clockwise from north: 180 is south. Each option covers 45 degrees either side of its centre, so south is 157.5 to 202.5.
+ */
+export function orientationFromBearing(deg: number): Orientation {
+  const b = ((deg % 360) + 360) % 360;
+  const fromSouth = Math.abs(b - 180); // 0 to 180
+  if (fromSouth <= 22.5) return 'S';
+  if (fromSouth <= 67.5) return 'SE_SW';
+  if (fromSouth <= 112.5) return 'E_W';
+  return 'N';
+}
+
 export function orientationFactor(o: Orientation): number {
   return { S: 1, SE_SW: 0.95, E_W: 0.82, N: 0.62 }[o];
 }
@@ -580,16 +592,12 @@ interface RowSpec { key: string; label: string; note: string; group: 'solar' | '
  * so changing "cost per kWp" or "cost base" in the assumptions scales the whole breakdown. lo and hi give each
  * line its own typical spread between cheap and expensive installers.
  */
-const ROWS: RowSpec[] = [
-  { key: 'panels', label: 'Solar panels', note: 'The panels themselves. Brand and efficiency change the price.', group: 'solar', perKwp: 260 / 1250, lo: 0.9, hi: 1.2 },
-  { key: 'inverter', label: 'Inverter', note: 'Turns panel output into household power. Hybrid models cost more.', group: 'solar', perKwp: 250 / 1250, lo: 0.9, hi: 1.2 },
-  { key: 'mounting', label: 'Mounting and fixings', note: 'Rails, roof hooks and weatherproofing for your roof type.', group: 'solar', perKwp: 160 / 1250, lo: 0.9, hi: 1.15 },
-  { key: 'labour', label: 'Installation labour', note: 'Roof and electrical crew time. Grows with system size.', group: 'solar', perKwp: 450 / 1250, lo: 0.85, hi: 1.2 },
-  { key: 'electrical', label: 'Electrical work and cabling', note: 'Cabling, protection devices, and consumer unit changes.', group: 'solar', perKwp: 130 / 1250, base: 600 / 2200, lo: 0.85, hi: 1.2 },
-  { key: 'access', label: 'Scaffolding and roof access', note: 'Usually a fixed charge. Higher for tall or awkward roofs.', group: 'solar', base: 800 / 2200, lo: 0.8, hi: 1.3 },
-  { key: 'admin', label: 'Design, grid application, commissioning', note: 'Survey, ESB Networks notification, testing and handover.', group: 'solar', base: 450 / 2200, lo: 0.9, hi: 1.2 },
-  { key: 'cover', label: 'Insurance, warranty and contingency', note: 'Cover on the work and an allowance for surprises.', group: 'solar', base: 350 / 2200, lo: 0.9, hi: 1.25 },
-];
+const CB = PRICES.solar.costBreakdown;
+const ROWS: RowSpec[] = CB.rows.map((r) => ({
+  key: r.key, label: r.label, note: r.note, group: r.group, lo: r.lo, hi: r.hi,
+  perKwp: r.perKwpEuro != null ? r.perKwpEuro / CB.referencePerKwp : undefined,
+  base: r.baseEuro != null ? r.baseEuro / CB.referenceBase : undefined,
+}));
 
 /** Itemised installed cost with a typical low to high range for each line. Empty when there are no panels. */
 export function costBreakdown(kwp: number, battery: number, a: Assumptions, site?: Pick<HomeInputs, 'roofType' | 'storeys'>): CostRow[] {
@@ -605,7 +613,7 @@ export function costBreakdown(kwp: number, battery: number, a: Assumptions, site
   if (battery > 0) {
     // the installed price covers the unit and its fitting; show roughly three quarters as the unit
     const p = batteryPrice(a.batteryTier, battery), t = batteryTierInfo(a.batteryTier);
-    const unit = (v: number) => Math.round(v * 0.75);
+    const unit = (v: number) => Math.round(v * PRICES.batterySpec.unitShareOfInstalled);
     out.push({ key: 'battery', label: `${t.label} battery, ${battery} kWh`, note: `Examples: ${t.examples.slice(0, 2).join(', ')}.`, group: 'battery', mid: unit(p.mid), low: unit(p.low), high: unit(p.high) });
     out.push({ key: 'battery-install', label: 'Battery installation and gateway', note: 'Wiring, mounting, controls and commissioning.', group: 'battery', mid: p.mid - unit(p.mid), low: p.low - unit(p.low), high: p.high - unit(p.high) });
   }
@@ -617,7 +625,7 @@ export function systemCost(kwp: number, battery: number, a: Assumptions, site?: 
 }
 
 /** ESB Networks limits a home connection by inverter size: about 6 kVA single-phase, 11 kVA three-phase. */
-export const CONNECTION_LIMIT_KW = { single: 6, three: 11 };
+export const CONNECTION_LIMIT_KW = { single: PRICES.connection.singlePhaseKw, three: PRICES.connection.threePhaseKw };
 
 export function connectionLimitPanels(home: HomeInputs, a: Assumptions): number {
   const kw = home.threePhase ? CONNECTION_LIMIT_KW.three : CONNECTION_LIMIT_KW.single;
@@ -648,7 +656,7 @@ export function simulate(usage: Usage, home: HomeInputs, a: Assumptions, cfg: Co
   const genAnnual = kwp * a.yieldPerKwp * siteOrientationFactor(home) * shadingFactor(home.shading);
   const shareSum = GEN_SHARE.reduce((x, y) => x + y, 0);
   const cap = cfg.batteryKwh;
-  const usable = cap * 0.9; // keep 10% reserve
+  const usable = cap * BATTERY_USABLE_SHARE; // the rest is kept in reserve
   const maxRate = Math.max(0.1, cap / 2); // kW charge/discharge, ~0.5C
   const eff = Math.sqrt(a.batteryEfficiency);
   const limitKw = inverterLimitKw(home);
@@ -790,8 +798,8 @@ export function exportTaxFor(income: number, people: number, a: Assumptions): Ex
 
 /** Standard and higher rate income tax with USC and PRSI, as a rough guide to the tax on export income above the allowance. */
 export const EXPORT_TAX_RATES = [
-  { rate: 0.28, label: 'Standard rate', hint: 'About 28% with USC and PRSI' },
-  { rate: 0.48, label: 'Higher rate', hint: 'About 48% with USC and PRSI' },
+  { rate: PRICES.tax.exportTaxRate, label: 'Standard rate', hint: `About ${Math.round(PRICES.tax.exportTaxRate * 100)}% with USC and PRSI` },
+  { rate: PRICES.tax.exportTaxRateHigher, label: 'Higher rate', hint: `About ${Math.round(PRICES.tax.exportTaxRateHigher * 100)}% with USC and PRSI` },
 ];
 
 export interface Scenario extends Result { label: string; blurb: string; key: string; meetsGoals?: boolean }
@@ -817,7 +825,7 @@ export const BOLD_MAX_GEN_RATIO = 1.5;
 export type Lean = 'solar' | 'balanced' | 'battery';
 export type BatteryMode = 'any' | 'none' | 'required';
 export interface Goals { cover: number; exportIncome: number; /** Which way to tip the mix when several meet the goals. Balanced picks the cheapest. */ lean?: Lean; /** Whether the mix may, may not, or must include a battery. */ battery?: BatteryMode }
-export const DEFAULT_GOALS: Goals = { cover: 0.6, exportIncome: 0, lean: 'balanced' };
+export const DEFAULT_GOALS: Goals = { cover: 0.6, exportIncome: 0, lean: 'balanced', battery: 'required' };
 
 export function pickStrategies(grid: Result[], exportExtra = false, goals: Goals = DEFAULT_GOALS): Scenario[] {
   const value = (r: Result) => r.netGain;
@@ -869,7 +877,7 @@ export function mixWarnings(r: Result, a: Assumptions, exportGoal = 0): MixNote[
   const notes: MixNote[] = [];
   if (r.kwp <= 0) return notes;
   if (r.batteryKwh > 0) {
-    const usable = r.batteryKwh * 0.9;
+    const usable = r.batteryKwh * BATTERY_USABLE_SHARE;
     const use = r.supply.battery / (usable * 365);
     if (use < 0.5) notes.push({ kind: 'battery-unused', text: `A typical day uses only about ${Math.round(use * 100)}% of this ${r.batteryKwh} kWh battery, so it rarely fills. A smaller battery or more panels would use it better.` });
   }
@@ -953,14 +961,14 @@ export function hoursInWindow(start: number, end: number): number[] {
 }
 
 function sizeFor(z: BatteryZones, average: number, winter: number): ZoneSize {
-  const nominalKwh = average / 0.9; // 10% is kept in reserve
+  const nominalKwh = average / BATTERY_USABLE_SHARE; // some capacity is kept in reserve
   const fit = BATTERY_SIZES.find((s) => s >= nominalKwh);
   return {
     needKwh: average, nominalKwh,
     size: average <= 0 ? 0 : fit ?? BATTERY_SIZES[BATTERY_SIZES.length - 1],
     tooBig: average > 0 && fit === undefined,
-    chargedAverage: average > 0 ? Math.min(1, (z.surplusAverage * 0.9) / average) : 1,
-    chargedWinter: winter > 0 ? Math.min(1, (z.surplusWinter * 0.9) / winter) : 1,
+    chargedAverage: average > 0 ? Math.min(1, (z.surplusAverage * BATTERY_USABLE_SHARE) / average) : 1,
+    chargedWinter: winter > 0 ? Math.min(1, (z.surplusWinter * BATTERY_USABLE_SHARE) / winter) : 1,
   };
 }
 
@@ -1004,12 +1012,12 @@ export interface StrategyTemplate {
 
 /** The strategies Irish households most often choose between, from solar for the day through to near independence. */
 export const STRATEGY_TEMPLATES: StrategyTemplate[] = [
-  { key: 'lowest', label: 'Lowest cost', blurb: 'Panels only, sized small. The quickest payback and the least money at risk.', goals: () => ({ cover: 0.25, exportIncome: 0, lean: 'balanced', battery: 'none' }), exportExtra: false, gridCharge: false },
-  { key: 'daytime', label: 'Solar for the daytime', blurb: 'Panels only, no battery. Use the sun while it shines and sell the rest. Suits homes busy in the day.', goals: () => ({ cover: 0.35, exportIncome: 0, lean: 'balanced', battery: 'none' }), exportExtra: false, gridCharge: false },
-  { key: 'evening', label: 'Solar and a battery for the evening', blurb: 'The battery stores daytime solar and runs the evening and night. The most common pairing.', goals: () => ({ cover: 0.6, exportIncome: 0, lean: 'balanced', battery: 'required' }), exportExtra: false, gridCharge: false },
-  { key: 'night-rate', label: 'Battery charged at the night rate', blurb: 'Solar in the day, and the battery tops up overnight on cheap power to cover the expensive hours.', goals: () => ({ cover: 0.65, exportIncome: 0, lean: 'balanced', battery: 'required' }), exportExtra: false, gridCharge: true, needsTimeOfUse: true },
-  { key: 'export', label: 'Solar for export income', blurb: 'More panels than you use, to sell the surplus. Aims at the tax-free export allowance.', goals: (h) => ({ cover: 0.4, exportIncome: 600 * h.taxpayers, lean: 'solar', battery: 'none' }), exportExtra: true, gridCharge: false },
-  { key: 'independent', label: 'Near independence', blurb: 'Big battery and enough panels to cover most of your use, with export on top. Still connected to the grid.', goals: () => ({ cover: 0.85, exportIncome: 0, lean: 'balanced', battery: 'required' }), exportExtra: true, gridCharge: false },
+  { key: 'lowest', label: 'Lowest cost', blurb: 'Panels only, sized small. Quickest payback, least at risk.', goals: () => ({ cover: 0.25, exportIncome: 0, lean: 'balanced', battery: 'none' }), exportExtra: false, gridCharge: false },
+  { key: 'daytime', label: 'Solar for the daytime', blurb: 'Panels only. Use the sun while it shines. Suits homes busy in the day.', goals: () => ({ cover: 0.35, exportIncome: 0, lean: 'balanced', battery: 'none' }), exportExtra: false, gridCharge: false },
+  { key: 'evening', label: 'Solar and a battery for the evening', blurb: 'A battery stores daytime solar for the evening. The most common pairing.', goals: () => ({ cover: 0.6, exportIncome: 0, lean: 'balanced', battery: 'required' }), exportExtra: false, gridCharge: false },
+  { key: 'night-rate', label: 'Battery charged at the night rate', blurb: 'The battery tops up overnight on cheap power and covers dear hours.', goals: () => ({ cover: 0.65, exportIncome: 0, lean: 'balanced', battery: 'required' }), exportExtra: false, gridCharge: true, needsTimeOfUse: true },
+  { key: 'export', label: 'Solar for export income', blurb: 'More panels than you use, to sell the surplus tax-free.', goals: (h) => ({ cover: 0.4, exportIncome: 600 * h.taxpayers, lean: 'solar', battery: 'none' }), exportExtra: true, gridCharge: false },
+  { key: 'independent', label: 'Near independence', blurb: 'Big battery and more panels to supply most of your use. Still on the grid.', goals: () => ({ cover: 0.85, exportIncome: 0, lean: 'balanced', battery: 'required' }), exportExtra: true, gridCharge: false },
 ];
 
 /** What a template would recommend for this home and usage, with its own export and charging settings. */
@@ -1029,12 +1037,12 @@ export interface Cashflow {
 
 /** Assumptions for the long view. Inverters and batteries wear out before panels, and replacements cost less than today's price. */
 export const LIFETIME = {
-  years: 25,
-  panelAgeing: 0.005, // output lost a year
-  inverterYear: 13,
-  inverterCostShare: 0.8,
-  batteryYear: 15,
-  batteryCostShare: 0.6,
+  years: PRICES.lifetime.years,
+  panelAgeing: PRICES.lifetime.panelAgeingPerYear, // output lost a year
+  inverterYear: PRICES.lifetime.inverterYear,
+  inverterCostShare: PRICES.lifetime.inverterCostShare,
+  batteryYear: PRICES.lifetime.batteryYear,
+  batteryCostShare: PRICES.lifetime.batteryCostShare,
 };
 
 export interface ProjectionInput {

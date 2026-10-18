@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 import { HomePage } from './pages/home';
-import { PlanPage, STEP_KEYS } from './pages/plan';
+import { PlanPage, stepIndex } from './pages/plan';
 import { GuidePage } from './pages/guide';
 import { ProviderPage, ReviewsPage } from './pages/reviews';
 import { QuotePage } from './pages/quote';
@@ -15,7 +15,7 @@ export const routes: Routes = [
   { path: '', component: HomePage, title: 'GreenWattz | Solar planner for Irish homes' },
   {
     path: 'plan', component: PlanPage, runGuardsAndResolvers: 'paramsOrQueryParamsChange',
-    title: (route) => { const k = route.queryParamMap.get('step'); const i = STEP_KEYS.indexOf(k ?? 'usage'); return `${['Usage', 'Home', 'Strategy', 'Cost'][i < 0 ? 0 : i]} | Plan your solar | GreenWattz`; },
+    title: (route) => `${['Usage', 'Home', 'Your plan'][stepIndex(route.queryParamMap.get('step'))]} | Plan your solar | GreenWattz`,
   },
   { path: 'guide/esb-data', component: GuidePage, title: 'Get your ESB smart meter data | GreenWattz' },
   { path: 'reviews', component: ReviewsPage, title: 'Solar installer reviews | GreenWattz' },

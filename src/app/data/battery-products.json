@@ -1,0 +1,78 @@
+{
+  "reviewedOn": "2026-10-18",
+  "note": "What each common brand sells, from manufacturer product ranges. Nominal kWh, so usable capacity is a little lower. Check against each brand when you review the prices.",
+  "products": [
+    {
+      "brand": "Huawei LUNA2000",
+      "tier": "mainstream",
+      "sizes": "5, 7, 10, 14, 15, 21 kWh",
+      "note": "Modular packs of 5, 7 or 10 kWh stacked up to three high."
+    },
+    {
+      "brand": "GivEnergy",
+      "tier": "value",
+      "sizes": "2.6, 5.2, 8.2, 9.5, 13.5 kWh",
+      "note": "Single units and an all-in-one; larger systems stack several."
+    },
+    {
+      "brand": "Sungrow SBR",
+      "tier": "mainstream",
+      "sizes": "9.6, 12.8, 16, 19.2, 22.4, 25.6 kWh",
+      "note": "Built in 3.2 kWh modules, usually from 9.6 kWh up."
+    },
+    {
+      "brand": "Tesla Powerwall 3",
+      "tier": "premium",
+      "sizes": "13.5 kWh",
+      "note": "One size, with the inverter built in."
+    },
+    {
+      "brand": "Sigenergy SigenStor",
+      "tier": "premium",
+      "sizes": "5, 8, 10, 13, 16, 20, 24, 30 kWh",
+      "note": "Modules of 5 or 8 kWh, scalable in steps."
+    },
+    {
+      "brand": "SolarEdge Home Battery",
+      "tier": "premium",
+      "sizes": "4.6, 9.2, 13.8 kWh",
+      "note": "Built from 4.6 kWh batteries, up to three together."
+    },
+    {
+      "brand": "BYD Battery-Box HVS",
+      "tier": "value",
+      "sizes": "5.1, 7.7, 10.2, 12.8 kWh",
+      "note": "High-voltage stack in 2.56 kWh steps."
+    },
+    {
+      "brand": "Fox ESS",
+      "tier": "value",
+      "sizes": "4.7, 5.8, 8.3, 11.6, 16.6 kWh",
+      "note": "EQ4800 and ECS ranges, stacked."
+    },
+    {
+      "brand": "SolaX Triple Power",
+      "tier": "value",
+      "sizes": "5.8, 11.6, 17.4 kWh",
+      "note": "5.8 kWh modules, stacked."
+    },
+    {
+      "brand": "Enphase IQ Battery",
+      "tier": "premium",
+      "sizes": "5, 10, 15 kWh",
+      "note": "5 kWh units, up to several together; works with Enphase microinverters."
+    },
+    {
+      "brand": "myenergi Libbi",
+      "tier": "mainstream",
+      "sizes": "5, 10, 15, 20 kWh",
+      "note": "5 kWh modules with its own inverter."
+    },
+    {
+      "brand": "Pylontech and Dyness",
+      "tier": "value",
+      "sizes": "3.5, 4.8, 5.1 kWh modules",
+      "note": "Low-voltage modules, often stacked to 10 to 20 kWh."
+    }
+  ]
+}

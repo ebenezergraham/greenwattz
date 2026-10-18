@@ -5,7 +5,89 @@
     "costBase": 2200,
     "costPerKwp": 1250,
     "yieldPerKwp": 920,
-    "note": "Installed price for a typical 4 kWp system is about 6,500 to 8,500 euro and 6 kWp about 9,000 to 12,000 euro before grants, at 0% VAT."
+    "note": "Installed price for a typical 4 kWp system is about 6,500 to 8,500 euro and 6 kWp about 9,000 to 12,000 euro before grants, at 0% VAT.",
+    "panelWatts": 465,
+    "panelAreaM2": 2.0,
+    "costBreakdown": {
+      "note": "Typical installer line items at the reference cost below. Each item is a share of the cost per kWp or of the fixed cost base, and lo and hi give its spread between cheaper and dearer installers.",
+      "referencePerKwp": 1250,
+      "referenceBase": 2200,
+      "rows": [
+        {
+          "key": "panels",
+          "label": "Solar panels",
+          "note": "The panels themselves. Brand and efficiency change the price.",
+          "group": "solar",
+          "perKwpEuro": 260,
+          "lo": 0.9,
+          "hi": 1.2
+        },
+        {
+          "key": "inverter",
+          "label": "Inverter",
+          "note": "Turns panel output into household power. Hybrid models cost more.",
+          "group": "solar",
+          "perKwpEuro": 250,
+          "lo": 0.9,
+          "hi": 1.2
+        },
+        {
+          "key": "mounting",
+          "label": "Mounting and fixings",
+          "note": "Rails, roof hooks and weatherproofing for your roof type.",
+          "group": "solar",
+          "perKwpEuro": 160,
+          "lo": 0.9,
+          "hi": 1.15
+        },
+        {
+          "key": "labour",
+          "label": "Installation labour",
+          "note": "Roof and electrical crew time. Grows with system size.",
+          "group": "solar",
+          "perKwpEuro": 450,
+          "lo": 0.85,
+          "hi": 1.2
+        },
+        {
+          "key": "electrical",
+          "label": "Electrical work and cabling",
+          "note": "Cabling, protection devices, and consumer unit changes.",
+          "group": "solar",
+          "perKwpEuro": 130,
+          "baseEuro": 600,
+          "lo": 0.85,
+          "hi": 1.2
+        },
+        {
+          "key": "access",
+          "label": "Scaffolding and roof access",
+          "note": "Usually a fixed charge. Higher for tall or awkward roofs.",
+          "group": "solar",
+          "baseEuro": 800,
+          "lo": 0.8,
+          "hi": 1.3
+        },
+        {
+          "key": "admin",
+          "label": "Design, grid application, commissioning",
+          "note": "Survey, ESB Networks notification, testing and handover.",
+          "group": "solar",
+          "baseEuro": 450,
+          "lo": 0.9,
+          "hi": 1.2
+        },
+        {
+          "key": "cover",
+          "label": "Insurance, warranty and contingency",
+          "note": "Cover on the work and an allowance for surprises.",
+          "group": "solar",
+          "baseEuro": 350,
+          "lo": 0.9,
+          "hi": 1.25
+        }
+      ]
+    }
   },
   "grants": {
     "seaiSolarFirst2kwpPerKwp": 700,
@@ -26,7 +108,16 @@
     "peak": 0.42,
     "export": 0.19,
     "exportPremium": 0.31,
-    "standingChargeMonthly": 35
+    "standingChargeMonthly": 35,
+    "vat": 0.09,
+    "priceRiseYearly": 0.02,
+    "billExample": {
+      "dayExVat": 0.3865,
+      "nightExVat": 0.2125,
+      "peakExVat": 0.434,
+      "discount": 0.32,
+      "note": "Unit rates before VAT and before a 32% supplier discount, read from a real Irish bill. They drive the Below typical and Above typical presets."
+    }
   },
   "battery": {
     "value": [
@@ -152,7 +243,8 @@
     "exportExemptionPerPerson": 600,
     "exportExemptionInForcePerPerson": 400,
     "exportTaxRate": 0.28,
-    "note": "Export income is exempt from income tax, USC and PRSI up to a limit per person. The limit in force has been 400 euro a year. Budget 2027 announced 600, with the start date still to be legislated. Above the limit it is taxed at your marginal rate, roughly 28 percent at the standard rate including USC and PRSI, and more at the higher rate."
+    "note": "Export income is exempt from income tax, USC and PRSI up to a limit per person. The limit in force has been 400 euro a year. Budget 2027 announced 600, with the start date still to be legislated. Above the limit it is taxed at your marginal rate, roughly 28 percent at the standard rate including USC and PRSI, and more at the higher rate.",
+    "exportTaxRateHigher": 0.48
   },
   "links": {
     "solarGrant": "https://www.seai.ie/grants/home-energy-grants/individual-grants/solar-electricity-grant",
@@ -162,5 +254,44 @@
     "installers": "https://www.seai.ie/grants/find-a-registered-professional/solar-pv-companies",
     "terms": "https://www.seai.ie/sites/default/files/2024-09/Solar-PV-Terms-And-Conditions.pdf",
     "govEnergyUpgrades": "https://www.gov.ie/en/department-of-climate-energy-and-the-environment/publications/energy-upgrades/"
+  },
+  "connection": {
+    "singlePhaseKw": 6,
+    "threePhaseKw": 11,
+    "note": "ESB Networks limits a home micro-generation connection by inverter size: about 6 kVA single-phase and 11 kVA three-phase."
+  },
+  "batterySpec": {
+    "sizes": [
+      5,
+      7,
+      8,
+      10,
+      13.5,
+      15,
+      20
+    ],
+    "roundTripEfficiency": 0.9,
+    "reserveShare": 0.1,
+    "unitShareOfInstalled": 0.75,
+    "note": "Sizes are nominal kWh the planner tests, taken from the module sizes the main brands sell. Reserve is the share of capacity kept back. The battery unit is about three quarters of the installed price, the rest is fitting."
+  },
+  "lifetime": {
+    "years": 25,
+    "panelAgeingPerYear": 0.005,
+    "inverterYear": 13,
+    "inverterCostShare": 0.8,
+    "batteryYear": 15,
+    "batteryCostShare": 0.6,
+    "note": "The long view. Panels lose a little output each year. Inverters and batteries are replaced part-way, at a share of today's price because prices fall."
+  },
+  "usage": {
+    "typicalHomeKwh": 4200,
+    "evKwhPerYear": 2600,
+    "heatPumpKwhPerYear": 3500,
+    "note": "The average Irish home, and what an electric car or heat pump adds."
+  },
+  "emissions": {
+    "co2KgPerKwh": 0.3,
+    "note": "Grid carbon intensity used for CO2 avoided."
   }
 }

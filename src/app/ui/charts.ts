@@ -122,12 +122,12 @@ export class MonthChart {
 @Component({
   selector: 'cash-chart',
   template: `
-    <svg [attr.viewBox]="'0 0 ' + W + ' ' + H" role="img" [attr.aria-label]="'Cumulative savings over 25 years. Break-even around year ' + breakEven()">
+    <svg [attr.viewBox]="'0 0 ' + W + ' ' + H" role="img" [attr.aria-label]="'Cumulative savings over ' + horizon() + ' years. Break-even around year ' + breakEven()">
       <line [attr.x1]="L" [attr.x2]="W" [attr.y1]="zero()" [attr.y2]="zero()" class="zero" />
       <path [attr.d]="area()" class="area" />
       <path [attr.d]="line()" class="line" />
       @for (t of yTicks(); track t.v) { <text [attr.x]="L - 6" [attr.y]="t.y + 4" text-anchor="end" class="axis">{{ t.label }}</text> }
-      @for (y of [0, 5, 10, 15, 20, 25]; track y) { <text [attr.x]="xx(y)" [attr.y]="H - 4" text-anchor="middle" class="axis">{{ y === 0 ? 'Now' : 'Yr ' + y }}</text> }
+      @for (y of xTicks(); track y) { <text [attr.x]="xx(y)" [attr.y]="H - 4" text-anchor="middle" class="axis">{{ y === 0 ? 'Now' : 'Yr ' + y }}</text> }
     </svg>
   `,
   styles: `
@@ -143,12 +143,15 @@ export class CashChart {
   readonly W = 640; readonly H = 220; readonly L = 56; readonly B = 22; readonly T = 10;
   private min = computed(() => Math.min(0, ...this.points().map((p) => p.cumulative)));
   private max = computed(() => Math.max(1, ...this.points().map((p) => p.cumulative)));
-  xx = (y: number) => this.L + ((this.W - this.L - 6) * y) / 25;
+  /** The last year on the chart, taken from the data so the axis follows the projection length. */
+  horizon = computed(() => Math.max(1, ...this.points().map((p) => p.year)));
+  xTicks = computed(() => { const h = this.horizon(), step = h > 20 ? 5 : h > 10 ? 2 : 1; const t: number[] = []; for (let y = 0; y <= h; y += step) t.push(y); return t; });
+  xx = (y: number) => this.L + ((this.W - this.L - 6) * y) / this.horizon();
   yv = (v: number) => this.T + (this.H - this.T - this.B) * (1 - (v - this.min()) / (this.max() - this.min()));
   zero = computed(() => this.yv(0));
   line = computed(() => 'M' + this.points().map((p) => `${this.xx(p.year)},${this.yv(p.cumulative)}`).join(' L'));
-  area = computed(() => `${this.line()} L${this.xx(25)},${this.zero()} L${this.xx(0)},${this.zero()} Z`);
-  breakEven = computed(() => this.points().find((p) => p.cumulative >= 0)?.year ?? 'beyond 25');
+  area = computed(() => `${this.line()} L${this.xx(this.horizon())},${this.zero()} L${this.xx(0)},${this.zero()} Z`);
+  breakEven = computed(() => this.points().find((p) => p.cumulative >= 0)?.year ?? 'beyond ' + this.horizon());
   yTicks = computed(() => {
     const lo = this.min(), hi = this.max();
     const step = Math.pow(10, Math.floor(Math.log10((hi - lo) / 3)));

@@ -3,7 +3,7 @@ import {
   PRICES, priceAgeDays, pricesAreStale,
   Eligibility, grantEligibility,
   Assumptions, BATTERY_OPTIONS, BATTERY_PRODUCTS, BATTERY_SIZES, BATTERY_TIERS, BatteryTier, batteryPrice, batteryTierInfo, BandMonthly, bandHours, medianFromBands, profileFromBands, Band, Tariff, bandBreakdown, bandOf, bandsOfDay, blendedRate, dayStats, rateFor, BEST_MAX_GEN_RATIO, CONNECTION_LIMIT_KW, HOUSE_TYPES, ROOF_TYPES, STOREY_ACCESS, roofTypeInfo, DEFAULT_ASSUMPTIONS as A, HomeInputs, MONTH_DAYS, NO_OBSTACLES, Usage,
-  annualFromBill, annualFromProfile, averageDay, buildGrid, cashflow, hoursInWindow, sizeForWindow, templateResult, STRATEGY_TEMPLATES, batteryZones, sizeForZones, ZONES, DEFAULT_GOALS, Goals, mixWarnings, EXPORT_PRESETS, ratePreset, RATE_PRESETS, inverterLimitKw, loanPayment, paybackRange, exportTaxFor, EXPORT_TAX_RATES, LIFETIME, paybackFrom, project, connectionLimitPanels, costBreakdown, estimateProfile,
+  annualFromBill, annualFromProfile, averageDay, buildGrid, cashflow, orientationFromBearing, hoursInWindow, sizeForWindow, templateResult, STRATEGY_TEMPLATES, batteryZones, sizeForZones, ZONES, DEFAULT_GOALS, Goals, mixWarnings, EXPORT_PRESETS, ratePreset, RATE_PRESETS, inverterLimitKw, loanPayment, paybackRange, exportTaxFor, EXPORT_TAX_RATES, LIFETIME, paybackFrom, project, connectionLimitPanels, costBreakdown, estimateProfile,
   maxPanels, obstacleArea, orientationFactor, pickStrategies, roofFitPanels, seaiGrantFor, shadingFactor, simulate, solarDay,
   splitUsage, systemCost, usableArea, withExtras,
 } from './engine';
@@ -794,7 +794,8 @@ describe('price data file', () => {
     expect(seaiGrantFor(10)).toBe(PRICES.grants.seaiSolarMax);
   });
   it('has sane export tax settings: the announced limit is above the one in force', () => {
-    expect(PRICES.tax.exportExemptionInForcePerPerson).toBe(400);
+    expect(PRICES.tax.exportExemptionInForcePerPerson).toBeGreaterThan(0);
+    expect(PRICES.tax.exportExemptionInForcePerPerson).toBeLessThanOrEqual(2000);
     expect(PRICES.tax.exportExemptionPerPerson).toBeGreaterThanOrEqual(PRICES.tax.exportExemptionInForcePerPerson);
     expect(PRICES.tax.exportTaxRate).toBeGreaterThan(0.1);
     expect(PRICES.tax.exportTaxRate).toBeLessThan(0.6);
@@ -803,11 +804,12 @@ describe('price data file', () => {
     for (const k of ['solarGrant', 'batteryGrant', 'enhanced', 'howToApply', 'installers'] as const) expect(PRICES.links[k]).toMatch(/^https:\/\/www\.seai\.ie\//);
     expect(PRICES.sources.some((x) => x.url === PRICES.links.batteryGrant)).toBe(true);
   });
-  it('has grant rules matching SEAI: 600 euro battery from 5 kWh, homes occupied before 2025', () => {
-    expect(PRICES.grants.seaiBattery).toBe(600);
-    expect(PRICES.grants.seaiBatteryMinKwh).toBe(5);
-    expect(PRICES.grants.seaiSolarBuiltBefore).toBe(2025);
-    expect(PRICES.grants.seaiBatteryBuiltBefore).toBe(2025);
+  it('has grant rules in a realistic range, so updating a grant does not mean editing this test', () => {
+    expect(PRICES.grants.seaiBattery).toBeGreaterThan(0);
+    expect(PRICES.grants.seaiBattery).toBeLessThanOrEqual(2000);
+    expect(PRICES.grants.seaiBatteryMinKwh).toBeGreaterThanOrEqual(1);
+    expect(PRICES.grants.seaiBatteryMinKwh).toBeLessThanOrEqual(10);
+    for (const y of [PRICES.grants.seaiSolarBuiltBefore, PRICES.grants.seaiBatteryBuiltBefore]) { expect(y).toBeGreaterThanOrEqual(2015); expect(y).toBeLessThanOrEqual(2040); }
   });
 });
 
@@ -1423,5 +1425,29 @@ describe('battery window against the meter median day', () => {
   it('still gives the average alongside for comparison', () => {
     const w = sizeForWindow(batteryZones(withMedian(flat(0.2)), home(), A, 12), win);
     expect(w.average).toBeGreaterThan(0);
+  });
+});
+
+describe('roof direction from a compass bearing', () => {
+  it('reads south as 180 degrees and its neighbours up to 22.5 degrees away', () => {
+    for (const d of [157.5, 170, 180, 195, 202.5]) expect(orientationFromBearing(d)).toBe('S');
+  });
+  it('reads south-east and south-west as 112.5 to 157.5 and 202.5 to 247.5', () => {
+    for (const d of [120, 135, 150, 210, 225, 245]) expect(orientationFromBearing(d)).toBe('SE_SW');
+  });
+  it('reads east and west as 67.5 to 112.5 and 247.5 to 292.5', () => {
+    for (const d of [70, 90, 110, 250, 270, 290]) expect(orientationFromBearing(d)).toBe('E_W');
+  });
+  it('reads north as the rest, either side of 0 degrees', () => {
+    for (const d of [0, 20, 45, 60, 300, 340, 359]) expect(orientationFromBearing(d)).toBe('N');
+  });
+  it('wraps readings outside 0 to 360', () => {
+    expect(orientationFromBearing(540)).toBe('S');
+    expect(orientationFromBearing(-180)).toBe('S');
+    expect(orientationFromBearing(360)).toBe('N');
+  });
+  it('matches the direction factors: south best, north worst', () => {
+    expect(orientationFactor(orientationFromBearing(180))).toBeGreaterThan(orientationFactor(orientationFromBearing(90)));
+    expect(orientationFactor(orientationFromBearing(90))).toBeGreaterThan(orientationFactor(orientationFromBearing(0)));
   });
 });

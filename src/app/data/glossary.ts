@@ -1,3 +1,5 @@
+import { PRICES } from '../core/engine';
+
 /**
  * Plain-English glossary for people starting out with home solar in Ireland.
  * Text supports **bold** and [label](url). `see` lists related term ids.
@@ -80,10 +82,10 @@ export const GLOSSARY: Term[] = [
     see: ['kwh', 'kwp'] },
   { id: 'kwh', term: 'kWh (kilowatt-hour)', group: 'Solar basics',
     short: 'A measure of energy: using 1 kW for one hour. It is the unit on your bill.',
-    more: 'The average Irish home uses roughly 4,200 kWh a year. A 10 kWh battery can hold about 10 kWh.',
+    more: `The average Irish home uses roughly ${PRICES.usage.typicalHomeKwh.toLocaleString('en-IE')} kWh a year. A 10 kWh battery can hold about 10 kWh.`,
     see: ['kw', 'unit-rate'] },
   { id: 'kwp', term: 'kWp (kilowatt-peak)', group: 'Solar basics',
-    short: 'The rated peak output of a set of solar panels. Twelve 465 W panels make a 5.58 kWp system.',
+    short: `The rated peak output of a set of solar panels. Twelve ${PRICES.solar.panelWatts} W panels make a ${(12 * PRICES.solar.panelWatts / 1000).toFixed(2)} kWp system.`,
     more: 'The kWp number is how installers describe system size. In Ireland, a system makes roughly 900 kWh a year for each kWp if it faces south.',
     see: ['kw', 'panel', 'yield'] },
   { id: 'microgeneration', term: 'Microgeneration', group: 'Solar basics',

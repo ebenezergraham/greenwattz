@@ -20,6 +20,6 @@ console.log(`Prices were last reviewed on **${p.reviewedOn}** (${age} days ago).
 ${sources}
 
 ## Also check
-- New battery brands or sizes that installers now fit.
+- New battery brands or sizes that installers now fit (update \`src/app/data/battery-products.json\` and \`batterySpec.sizes\`).
 - Whether any installer's published prices have moved by more than 10 percent.
 `);

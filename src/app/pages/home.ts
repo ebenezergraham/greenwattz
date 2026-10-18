@@ -135,7 +135,7 @@ import { DayChart } from '../ui/charts';
 export class HomePage {
   readonly latest = [...POSTS].sort((a, b) => b.date.localeCompare(a.date))[0];
   readonly grants = PRICES.grants;
-  readonly kwh = signal(4200);
+  readonly kwh = signal(PRICES.usage.typicalHomeKwh);
   private home: HomeInputs = {
     houseType: 'semi', roofType: 'pitched', storeys: 2, taxpayers: 1, yearOccupied: 2000, occupancy: 'mixed', orientation: 'S',
     shading: 'none', roofAreaM2: 30, obstacles: { ...NO_OBSTACLES }, threePhase: false, addEv: false, addHeatPump: false,

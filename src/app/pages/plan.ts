@@ -4,15 +4,21 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
 import { PlanStore } from '../core/store';
-import { Assumptions, BatteryMode, STRATEGY_TEMPLATES, StrategyTemplate, templateResult, batteryZones, hoursInWindow, sizeForWindow, Lean, mixWarnings, EXPORT_PRESETS, RATE_PRESETS, RatePresetKey, ratePreset, inverterLimitKw, siteOrientationFactor, shadingFactor, roofTypeInfo, BATTERY_PRODUCTS, BATTERY_SIZES, loanPayment, paybackRange, EXPORT_TAX_RATES, exportTaxFor, PRICES, grantEligibility, seaiGrantFor, BATTERY_GUIDE, BATTERY_OPTIONS, BATTERY_TIERS, BatteryTier, batteryPrice, HOUSE_TYPES, HouseType, OBSTACLES, ObstacleKey, ROOF_TYPES, RoofType, Storeys, Orientation, Occupancy, Shading, Scenario, Tariff, bandsOfDay, simulate, solarDay } from '../core/engine';
+import { Assumptions, BATTERY_USABLE_SHARE, LIFETIME, DEFAULT_GOALS, orientationFromBearing, BatteryMode, STRATEGY_TEMPLATES, StrategyTemplate, templateResult, batteryZones, hoursInWindow, sizeForWindow, Lean, mixWarnings, EXPORT_PRESETS, RATE_PRESETS, RatePresetKey, ratePreset, inverterLimitKw, siteOrientationFactor, shadingFactor, roofTypeInfo, BATTERY_PRODUCTS, BATTERY_SIZES, loanPayment, paybackRange, EXPORT_TAX_RATES, exportTaxFor, PRICES, grantEligibility, seaiGrantFor, BATTERY_GUIDE, BATTERY_OPTIONS, BATTERY_TIERS, BatteryTier, batteryPrice, HOUSE_TYPES, HouseType, OBSTACLES, ObstacleKey, ROOF_TYPES, RoofType, Storeys, Orientation, Occupancy, Shading, Scenario, Tariff, bandsOfDay, simulate, solarDay } from '../core/engine';
 import { HdfError, parseHdf } from '../core/hdf';
 import { inferHousehold } from '../core/infer';
 import { CashChart, DayChart, Legend, MonthChart } from '../ui/charts';
 import { EstimateNote } from '../ui/estimate-note';
 import { INSTALLER_CHECKLIST } from '../core/site';
 
-const STEPS = ['Usage', 'Home', 'Strategy', 'Cost'];
-export const STEP_KEYS = ['usage', 'home', 'strategy', 'cost'];
+const STEPS = ['Usage', 'Home', 'Your plan'];
+export const STEP_KEYS = ['usage', 'home', 'plan'];
+/** Old links used ?step=strategy and ?step=cost; both now open the merged plan step. */
+export function stepIndex(key: string | null): number {
+  if (key === 'strategy' || key === 'cost') return 2;
+  const i = STEP_KEYS.indexOf(key ?? 'usage');
+  return i < 0 ? 0 : i;
+}
 
 @Component({
   selector: 'page-plan',
@@ -23,6 +29,13 @@ export const STEP_KEYS = ['usage', 'home', 'strategy', 'cost'];
 export class PlanPage {
   readonly s = inject(PlanStore);
   readonly steps = STEPS;
+  /** Values that change over time live in the data files; the page reads them from here. */
+  readonly life = LIFETIME;
+  readonly typicalKwh = PRICES.usage.typicalHomeKwh;
+  readonly defaultWatts = PRICES.solar.panelWatts;
+  readonly reserveShare = PRICES.batterySpec.reserveShare;
+  pct1(n: number): string { return +(n * 100).toFixed(1) + '%'; }
+  private autoPicked = false;
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   /** The step lives in the URL (?step=cost), so browser Back and links to a step work. */
@@ -44,7 +57,7 @@ export class PlanPage {
       ori, shade, withShade, raw, oriName, tariff, source,
       yield: a.yieldPerKwp, watts: a.panelWatts, june: r.monthlyGen[5], dec: r.monthlyGen[11],
       clipped: Math.max(0, raw - r.generationKwh), limit: inverterLimitKw(h),
-      usable: Math.round(r.batteryKwh * 0.9 * 10) / 10, eff: Math.round(a.batteryEfficiency * 100),
+      usable: Math.round(r.batteryKwh * BATTERY_USABLE_SHARE * 10) / 10, eff: Math.round(a.batteryEfficiency * 100),
       sunny: this.s.dayStats().sunnyHoursPct,
     };
   });
@@ -97,6 +110,33 @@ export class PlanPage {
   windowOn(start: number, end: number) { return this.winStart() === start && this.winEnd() === end; }
   clock(h: number): string { h = ((h % 24) + 24) % 24; return h === 0 ? '12am' : h < 12 ? h + 'am' : h === 12 ? '12pm' : h - 12 + 'pm'; }
   useZoneSize() { const z = this.zoneSize(); if (z.size > 0) this.setBattery(z.size); }
+  /** Scroll to a section of the plan page, opening it first if it is a closed drawer. */
+  jump(id: string, open = false) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (open && el instanceof HTMLDetailsElement) el.open = true;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  /** The strategy to recommend: the best 25 year gain among those that supply at least half the household's use. */
+  readonly recommendedTemplate = computed(() => {
+    // A strategy that would silently switch a flat tariff is offered but not recommended.
+    const rows = this.templateRows().filter((x) => !(x.t.needsTimeOfUse && this.s.assumptions().tariff === 'flat'));
+    const ok = rows.filter((x) => x.r.selfSufficiency >= 0.5 && x.r.meetsGoals !== false);
+    const pool = ok.length ? ok : rows;
+    return [...pool].sort((a, b) => b.r.netGain - a.r.netGain)[0]?.t.key ?? null;
+  });
+  /** One line saying what the plan aims for and what is chosen, shown on the closed Fine-tune drawer. */
+  readonly fineSummary = computed(() => {
+    const g = this.s.goals(), r = this.r(), t = this.activeTemplate();
+    const name = t ? STRATEGY_TEMPLATES.find((x) => x.key === t)!.label : 'Custom goals';
+    return `${name}: ${r.panels} panels, ${r.batteryKwh ? r.batteryKwh + ' kWh battery' : 'no battery'}, aims for ${Math.round(g.cover * 100)}% supplied${g.exportIncome ? ' and ' + this.eur0(g.exportIncome) + ' export' : ''}`;
+  });
+  /** A short description of the home details tucked under "More about your home". */
+  readonly homeSummary = computed(() => {
+    const h = this.s.home();
+    const type = HOUSE_TYPES.find((t) => t.key === h.houseType)?.label ?? '';
+    return `${type}, ${h.storeys === 3 ? '3+ storeys' : h.storeys + (h.storeys === 1 ? ' storey' : ' storeys')}, ${roofTypeInfo(h.roofType).label.toLowerCase()}, ${h.threePhase ? 'three-phase' : 'single-phase'}`;
+  });
   readonly bandNames: Record<string, string> = { flat: 'All day', night: 'Night (11pm to 8am)', day: 'Day', peak: 'Peak (5pm to 7pm)' };
   /** Yearly electricity by source, as shares of what the home uses. */
   readonly sources = computed(() => {
@@ -148,8 +188,17 @@ export class PlanPage {
   setHasBattery(on: boolean) { this.setBattery(on ? this.lastBattery() : 0); }
   constructor() {
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((q) => {
-      const i = STEP_KEYS.indexOf(q.get('step') ?? 'usage');
-      this.step.set(i < 0 ? 0 : i);
+      const i = stepIndex(q.get('step'));
+      this.step.set(i);
+      // The first time the plan opens, start from the recommended strategy, unless the user has already set goals.
+      if (i === 2 && !this.autoPicked) {
+        this.autoPicked = true;
+        const g = this.s.goals(), d = DEFAULT_GOALS;
+        const untouched = g.cover === d.cover && g.exportIncome === d.exportIncome && (g.lean ?? 'balanced') === (d.lean ?? 'balanced') && (g.battery ?? 'any') === (d.battery ?? 'any');
+        const rec = this.recommendedTemplate();
+        const t = STRATEGY_TEMPLATES.find((x) => x.key === rec);
+        if (untouched && this.s.chosen() === null && t && this.activeTemplate() !== t.key) this.applyTemplate(t);
+      }
     });
   }
   readonly fileError = signal('');
@@ -373,9 +422,22 @@ export class PlanPage {
     });
   });
 
-  go(n: number) { const i = Math.max(0, Math.min(3, n)); this.router.navigate([], { relativeTo: this.route, queryParams: { step: STEP_KEYS[i] }, queryParamsHandling: 'merge' }); scrollTo({ top: 0, behavior: 'instant' }); }
+  go(n: number) { const i = Math.max(0, Math.min(2, n)); this.router.navigate([], { relativeTo: this.route, queryParams: { step: STEP_KEYS[i] }, queryParamsHandling: 'merge' }); scrollTo({ top: 0, behavior: 'instant' }); }
 
   setOcc(v: Occupancy) { this.s.occupancyTouched.set(true); this.s.patchHome({ occupancy: v }); }
+  /** A compass reading the user typed, and the direction option it maps to. */
+  readonly bearing = signal<number | null>(null);
+  readonly bearingLabel = computed(() => {
+    const b = this.bearing();
+    return b == null ? '' : ({ S: 'south', SE_SW: 'south-east or south-west', E_W: 'east or west', N: 'north' } as const)[orientationFromBearing(b)];
+  });
+  setBearing(e: Event) {
+    const raw = (e.target as HTMLInputElement).value.trim();
+    const v = raw === '' ? NaN : +raw;
+    if (!Number.isFinite(v) || v < 0 || v > 360) { this.bearing.set(null); return; }
+    this.bearing.set(v);
+    this.setOri(orientationFromBearing(v));
+  }
   setOri(v: Orientation) { this.s.patchHome({ orientation: v }); }
   setShade(v: Shading) { this.s.patchHome({ shading: v }); }
   num(e: Event): number { return +(e.target as HTMLInputElement).value; }
@@ -443,6 +505,6 @@ export class PlanPage {
   });
   setLoanRate(e: Event) { const v = this.num(e); if (v >= 0 && v <= 30) this.loanRate.set(v); }
   abs(n: number) { return Math.abs(n); }
-  payback(y: number): string { return isFinite(y) && y <= 25 ? y.toFixed(1) + ' years' : 'Over 25 years'; }
+  payback(y: number): string { return isFinite(y) && y <= LIFETIME.years ? y.toFixed(1) + ' years' : 'Over ' + LIFETIME.years + ' years'; }
   pc(n: number): string { return Math.round(n * 100) + '%'; }
 }

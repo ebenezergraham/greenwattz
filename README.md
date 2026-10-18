@@ -41,6 +41,23 @@ How sizing works: the recommendation never exceeds what your roof fits or what a
 Every price, grant and rate behind the estimates lives in `src/app/data/prices.json`, with a `reviewedOn` date and a list of sources. The engine reads it, the planner shows the review date next to the figures ("Estimates, not quotes"), and the `/estimates` page ("How we estimate") is generated from it.
 
 - **Update:** compare the sources in the file with current figures, edit the values, set `reviewedOn` to today, run `npm test`, push to `main`.
+- **No numbers in the code.** Anything that changes over time is in the data files, not `engine.ts`:
+
+  | What | Where in `prices.json` |
+  |---|---|
+  | Installed solar cost, yield, panel watts and size, the cost line items | `solar` (and `solar.costBreakdown`) |
+  | SEAI grant amounts, cut-off years, minimum battery size | `grants` |
+  | Unit rates, export rates, standing charge, VAT, yearly price rise, the example bill behind the rate presets | `tariffs` |
+  | Export tax allowance and tax rates | `tax` |
+  | Home connection limits (single and three phase) | `connection` |
+  | Battery prices by tier and size | `battery` |
+  | Battery sizes tested, efficiency, reserve, unit share of the price | `batterySpec` |
+  | Panel ageing, inverter and battery replacement years and costs, projection length | `lifetime` |
+  | Typical home use, EV and heat pump kWh | `usage` |
+  | Grid carbon intensity | `emissions` |
+
+  Brand and size lists are in `src/app/data/battery-products.json`. Fixed physical facts (Irish daylight and monthly sun shape) stay in code.
+- **Tests keep it honest.** `src/app/core/data.spec.ts` holds a realistic range for every value, plus ordering checks (night below day, premium export above typical, battery sizes ascending, line items adding up to the cost per kWp). A typo such as a price ten times too high fails, but a real market move does not. If a genuine change falls outside a range, widen it in `BOUNDS` on purpose.
 - **Reminder:** `.github/workflows/price-review.yml` runs monthly and opens a GitHub issue (with the checklist and source links) once a review is within 10 days of due.
 - **Stale warning:** if the file is more than `reviewEveryDays` (60) old, the site tells visitors the prices may be out of date.
 
