@@ -3,7 +3,7 @@ import {
   PRICES, priceAgeDays, pricesAreStale,
   Eligibility, grantEligibility,
   Assumptions, BATTERY_OPTIONS, BATTERY_PRODUCTS, BATTERY_SIZES, BATTERY_TIERS, BatteryTier, batteryPrice, batteryTierInfo, BandMonthly, bandHours, medianFromBands, profileFromBands, Band, Tariff, bandBreakdown, bandOf, bandsOfDay, blendedRate, dayStats, rateFor, BEST_MAX_GEN_RATIO, CONNECTION_LIMIT_KW, HOUSE_TYPES, ROOF_TYPES, STOREY_ACCESS, roofTypeInfo, DEFAULT_ASSUMPTIONS as A, HomeInputs, MONTH_DAYS, NO_OBSTACLES, Usage,
-  annualFromBill, annualFromProfile, averageDay, buildGrid, cashflow, inverterLimitKw, loanPayment, paybackRange, exportTaxFor, EXPORT_TAX_RATES, LIFETIME, paybackFrom, project, connectionLimitPanels, costBreakdown, estimateProfile,
+  annualFromBill, annualFromProfile, averageDay, buildGrid, cashflow, ratePreset, RATE_PRESETS, inverterLimitKw, loanPayment, paybackRange, exportTaxFor, EXPORT_TAX_RATES, LIFETIME, paybackFrom, project, connectionLimitPanels, costBreakdown, estimateProfile,
   maxPanels, obstacleArea, orientationFactor, pickStrategies, roofFitPanels, seaiGrantFor, shadingFactor, simulate, solarDay,
   splitUsage, systemCost, usableArea, withExtras,
 } from './engine';
@@ -1069,5 +1069,79 @@ describe('watts per panel', () => {
     expect(hi.kwp).toBeCloseTo(5, 9);
     expect(hi.generationKwh / lo.generationKwh).toBeCloseTo(500 / 400, 2);
     expect(hi.grossCost).toBeGreaterThan(lo.grossCost);
+  });
+});
+
+describe('where the power comes from', () => {
+  const run = (kwh: number, a: Partial<typeof A> = {}) => simulate(usage(), home(), { ...A, ...a }, { panels: 10, batteryKwh: kwh });
+  it('adds the bands up to the bill and the imports', () => {
+    const r = run(10);
+    expect(r.byBand.reduce((t, b) => t + b.afterCost, 0)).toBeCloseTo(r.billAfter, 6);
+    expect(r.byBand.reduce((t, b) => t + b.beforeCost, 0)).toBeCloseTo(r.billBefore, 6);
+    expect(r.byBand.reduce((t, b) => t + b.afterKwh, 0)).toBeCloseTo(r.importKwh, 6);
+    expect(r.byBand.reduce((t, b) => t + b.beforeKwh, 0)).toBeCloseTo(r.baselineImportKwh, 6);
+  });
+  it('splits all demand between solar, battery and the grid', () => {
+    const r = run(10);
+    const demand = r.monthlyDemand.reduce((a, b) => a + b, 0);
+    expect(r.supply.direct + r.supply.battery + r.supply.gridDay + r.supply.gridNight).toBeCloseTo(demand, 6);
+  });
+  it('has no battery supply without a battery, and some with one', () => {
+    expect(run(0).supply.battery).toBe(0);
+    expect(run(10).supply.battery).toBeGreaterThan(0);
+  });
+  it('uses the battery at night when it can, and still buys power at night', () => {
+    const r = run(10);
+    expect(r.supply.batteryNight).toBeGreaterThan(0);
+    expect(r.supply.batteryNight).toBeLessThanOrEqual(r.supply.battery);
+    expect(r.supply.gridNight).toBeGreaterThan(0);
+  });
+  it('buys more at night with grid charging because the battery fills overnight', () => {
+    expect(run(10, { gridCharge: true }).supply.gridNight).toBeGreaterThan(run(10, { gridCharge: false }).supply.gridNight);
+  });
+  it('lists only the bands the tariff uses', () => {
+    expect(run(0, { tariff: 'flat' }).byBand.map((b) => b.band)).toEqual(['flat']);
+    expect(run(0, { tariff: 'smart' }).byBand.map((b) => b.band).sort()).toEqual(['day', 'night', 'peak']);
+  });
+});
+
+describe('rate presets and VAT', () => {
+  it('adds 9% VAT by default', () => expect(A.vat).toBe(0.09));
+  it('builds below typical from the bill rates less 32%, plus VAT', () => {
+    const p = ratePreset('below', 0.09);
+    expect(p.dayRate).toBeCloseTo(0.3865 * 0.68 * 1.09, 6);
+    expect(p.nightRate).toBeCloseTo(0.2125 * 0.68 * 1.09, 6);
+    expect(p.peakRate).toBeCloseTo(0.434 * 0.68 * 1.09, 6);
+  });
+  it('builds above typical from the list rates plus VAT, with no discount', () => {
+    const p = ratePreset('above', 0.09);
+    expect(p.dayRate).toBeCloseTo(0.3865 * 1.09, 6);
+  });
+  it('uses the published typical rates for typical', () => {
+    const p = ratePreset('typical', 0.09);
+    expect(p.dayRate).toBe(A.dayRate);
+    expect(p.nightRate).toBe(A.nightRate);
+    expect(p.flatRate).toBe(A.flatRate);
+  });
+  it('orders below, typical, above for every rate', () => {
+    const [b, t, a] = (['below', 'typical', 'above'] as const).map((k) => ratePreset(k, 0.09));
+    expect(b.dayRate).toBeLessThan(t.dayRate);
+    expect(t.dayRate).toBeLessThan(a.dayRate);
+    expect(b.nightRate).toBeLessThan(a.nightRate);
+    expect(b.flatRate).toBeLessThan(a.flatRate);
+  });
+  it('follows a different VAT rate and lists all three presets', () => {
+    expect(ratePreset('above', 0.135).dayRate).toBeGreaterThan(ratePreset('above', 0.09).dayRate);
+    expect(RATE_PRESETS.map((p) => p.key)).toEqual(['below', 'typical', 'above']);
+  });
+  it('matches the bill: the discount is 32% of unit charges', () => {
+    const units = 102.01 + 29.38 + 16.22;
+    expect(47.23 / units).toBeCloseTo(0.32, 2);
+  });
+  it('lowers the bill and raises payback when rates are lower', () => {
+    const lo = simulate(usage(), home(), { ...A, ...ratePreset('below', 0.09) }, { panels: 10, batteryKwh: 0 });
+    const hi = simulate(usage(), home(), { ...A, ...ratePreset('above', 0.09) }, { panels: 10, batteryKwh: 0 });
+    expect(lo.billBefore).toBeLessThan(hi.billBefore);
+    expect(lo.paybackYears).toBeGreaterThan(hi.paybackYears);
   });
 });

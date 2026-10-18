@@ -34,26 +34,54 @@ export const PRIORITIES: { key: Priority; label: string; ask: string }[] = [
   { key: 'communication', label: 'Communication', ask: 'Ask who your single point of contact is and how long the process takes.' },
 ];
 
-export interface Ranked { installer: Installer; score: number; reputation: number; backed: Priority[] }
+/** Things we can rank on today because they come from public reviews. */
+export type DataCriterion = 'trustpilot' | 'google' | 'experience';
+export type Criterion = Priority | DataCriterion;
+
+export const DATA_CRITERIA: { key: DataCriterion; label: string; hint: string }[] = [
+  { key: 'trustpilot', label: 'Trustpilot rating', hint: 'Score on Trustpilot, adjusted for how many reviews it rests on.' },
+  { key: 'google', label: 'Google Maps rating', hint: 'Score on Google Maps, adjusted the same way.' },
+  { key: 'experience', label: 'Track record', hint: 'How many customers have reviewed them, a sign of how long and how much they install.' },
+];
+export const criterionLabel = (k: Criterion) => DATA_CRITERIA.find((c) => c.key === k)?.label ?? PRIORITIES.find((p) => p.key === k)!.label;
+
+export interface Ranked { installer: Installer; score: number; reputation: number; backed: Criterion[] }
+
+/** Review volume on a 3 to 5 scale, so it blends with ratings: the most reviewed installer gets 5, a 100-review one gets 3. */
+function experienceScores(list: Installer[]): Map<string, number> {
+  const n = (i: Installer) => (i.trustpilot?.count ?? 0) + (i.google?.count ?? 0);
+  const top = Math.max(...list.map(n), 101);
+  return new Map(list.map((i) => [i.slug, 3 + 2 * Math.min(1, Math.log(Math.max(n(i), 100) / 100) / Math.log(top / 100))]));
+}
 
 /**
- * Ranks installers. The reputation baseline is the review-count-adjusted Trustpilot score. For each
- * priority the user cares about, a verified score replaces the baseline when we have one.
+ * Ranks installers. Public review criteria (Trustpilot, Google, track record) always use real data. The five
+ * "ask the installer" priorities use a verified score when we have one, and otherwise fall back to the
+ * reputation baseline. A criterion missing from `weights` counts for nothing.
  * Installers with fewer than `minReviews` Trustpilot reviews are left out.
  */
-export function rank(weights: Record<Priority, number>, minReviews = 100, list: Installer[] = ALL): Ranked[] {
-  const total = Object.values(weights).reduce((a, b) => a + b, 0) || 1;
-  return list
-    .filter((i) => (i.trustpilot?.count ?? 0) >= minReviews)
+export function rank(weights: Partial<Record<Criterion, number>>, minReviews = 100, list: Installer[] = ALL): Ranked[] {
+  const total = Object.values(weights).reduce((a, b) => a + (b ?? 0), 0) || 1;
+  const eligible = list.filter((i) => (i.trustpilot?.count ?? 0) >= minReviews);
+  const exp = experienceScores(eligible);
+  return eligible
     .map((i) => {
       const reputation = adjusted(i.trustpilot!.score!, i.trustpilot!.count);
-      const backed: Priority[] = [];
+      const googleScore = i.google?.rating != null ? adjusted(i.google.rating, i.google.count) : null;
+      const backed: Criterion[] = [];
       let score = 0;
+      const add = (key: Criterion, value: number, real: boolean) => {
+        const w = weights[key] ?? 0;
+        if (w <= 0) return;
+        if (real) backed.push(key);
+        score += (w / total) * value;
+      };
+      add('trustpilot', reputation, true);
+      add('google', googleScore ?? reputation, googleScore != null);
+      add('experience', exp.get(i.slug)!, true);
       for (const p of PRIORITIES) {
-        const w = weights[p.key] ?? 0;
         const v = i.verified?.[p.key];
-        if (v != null && w > 0) backed.push(p.key);
-        score += (w / total) * (v ?? reputation);
+        add(p.key, v ?? reputation, v != null);
       }
       return { installer: i, score, reputation, backed };
     })

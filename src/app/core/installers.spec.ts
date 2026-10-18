@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Installer, SeaiCompany, adjusted, rank, seaiMatch, PRIORITIES } from './installers';
+import { Installer, SeaiCompany, adjusted, rank, seaiMatch, PRIORITIES, DATA_CRITERIA, criterionLabel } from './installers';
 
 const mk = (slug: string, name: string, score: number, count: number, extra: Partial<Installer> = {}): Installer => ({
   slug, name, kind: 'Solar installer', domain: `${slug}.ie`, google: null,
@@ -44,6 +44,40 @@ describe('installer ranking', () => {
   });
   it('has a question to ask for each priority', () => {
     for (const p of PRIORITIES) expect(p.ask.length).toBeGreaterThan(10);
+  });
+});
+
+describe('weighting public review criteria', () => {
+  const g = (rating: number, count: number) => ({ rating, count, url: 'https://maps.example', asOf: '2026-10-17' });
+  const l = [
+    mk('rated', 'Rated', 4.6, 400, { google: g(4.9, 800) }),
+    mk('busy', 'Busy', 4.6, 5000, { google: g(4.5, 3000) }),
+  ];
+  it('puts the better Google rating first when that is what matters', () => {
+    expect(rank({ google: 3 }, 100, l)[0].installer.slug).toBe('rated');
+  });
+  it('puts the most reviewed first when track record is what matters', () => {
+    expect(rank({ experience: 3 }, 100, l)[0].installer.slug).toBe('busy');
+  });
+  it('lets the user flip the order by changing the weights', () => {
+    expect(rank({ google: 3 }, 100, l)[0].installer.slug).not.toBe(rank({ experience: 3 }, 100, l)[0].installer.slug);
+  });
+  it('counts a criterion left out of the weights for nothing', () => {
+    const a = rank({ trustpilot: 1 }, 100, l).map((r) => r.installer.slug);
+    const b = rank({ trustpilot: 1, google: 0, experience: 0 }, 100, l).map((r) => r.installer.slug);
+    expect(a).toEqual(b);
+  });
+  it('marks review criteria as backed by data, but not a missing Google rating', () => {
+    const noGoogle = [mk('x', 'X', 4.6, 400)];
+    expect(rank({ trustpilot: 1, google: 1, experience: 1 }, 100, noGoogle)[0].backed).toEqual(['trustpilot', 'experience']);
+    expect(rank({ trustpilot: 1, google: 1, experience: 1 }, 100, l)[0].backed).toEqual(['trustpilot', 'google', 'experience']);
+  });
+  it('keeps scores on the same scale as ratings', () => {
+    for (const r of rank({ trustpilot: 1, google: 1, experience: 1 }, 100, l)) { expect(r.score).toBeGreaterThanOrEqual(3); expect(r.score).toBeLessThanOrEqual(5); }
+  });
+  it('has labels for every criterion', () => {
+    for (const c of DATA_CRITERIA) expect(criterionLabel(c.key)).toBe(c.label);
+    expect(criterionLabel('price')).toBe('Price');
   });
 });
 

@@ -7,7 +7,11 @@ import { HOUSE_TYPES, OBSTACLES, roofTypeInfo } from '../core/engine';
 
 const HOUSE_LABEL = Object.fromEntries(HOUSE_TYPES.map((t) => [t.key, t.label.toLowerCase()])) as Record<string, string>;
 import { INTRODUCTION_INSTALLERS, SITE } from '../core/site';
-import { Installer, PRIORITIES, Priority, rank, siteUrl, mapsUrl, seaiMatch } from '../core/installers';
+import { Criterion, DATA_CRITERIA, Installer, PRIORITIES, rank, siteUrl, mapsUrl, seaiMatch, criterionLabel } from '../core/installers';
+
+/** How much a criterion counts. Skip leaves it out; the weights give a clear step between each level. */
+const LEVELS = [{ n: 0, label: 'Skip', w: 0 }, { n: 1, label: 'Some', w: 1 }, { n: 2, label: 'Important', w: 2.5 }, { n: 3, label: 'Top', w: 4 }];
+const DEFAULT_LEVELS: Record<Criterion, number> = { trustpilot: 2, google: 1, experience: 1, price: 0, quality: 0, warranty: 0, aftercare: 0, communication: 0 };
 
 @Component({
   selector: 'page-quote',
@@ -20,18 +24,31 @@ import { Installer, PRIORITIES, Priority, rank, siteUrl, mapsUrl, seaiMatch } fr
 
       <div class="grid">
         <section class="main">
-          <h2 class="qh">What matters most?</h2>
-          <fieldset class="picks">
-            <legend class="hint">Pick up to three. Leave all unticked to weigh them equally.</legend>
-            @for (p of priorities; track p.key) {
-              <label class="pick" [class.on]="picks().has(p.key)">
-                <input type="checkbox" [checked]="picks().has(p.key)" [disabled]="!picks().has(p.key) && picks().size >= 3" (change)="toggleKey(p.key)" />
-                <span>{{ p.label }}</span>
-              </label>
+          <h2 class="qh">What matters to you?</h2>
+          <p class="hint">Set how much each thing counts. The list below re-orders as you change it.</p>
+          <div class="weights">
+            <h3 class="wg">From public reviews <span class="muted small">Used to rank installers</span></h3>
+            @for (c of dataCriteria; track c.key) {
+              <div class="wrow">
+                <div class="wl"><b id="w-{{ c.key }}">{{ c.label }}</b><span class="small muted">{{ c.hint }}</span></div>
+                <div class="seg lv" role="group" [attr.aria-labelledby]="'w-' + c.key">
+                  @for (l of levelOptions; track l.n) { <button type="button" [attr.aria-pressed]="levels()[c.key] === l.n" (click)="setLevel(c.key, l.n)">{{ l.label }}</button> }
+                </div>
+              </div>
             }
-          </fieldset>
+            <h3 class="wg">Ask the installer <span class="muted small">No verified data yet, so these shape your questions list</span></h3>
+            @for (p of priorities; track p.key) {
+              <div class="wrow">
+                <div class="wl"><b id="w-{{ p.key }}">{{ p.label }}</b></div>
+                <div class="seg lv" role="group" [attr.aria-labelledby]="'w-' + p.key">
+                  @for (l of levelOptions; track l.n) { <button type="button" [attr.aria-pressed]="levels()[p.key] === l.n" (click)="setLevel(p.key, l.n)">{{ l.label }}</button> }
+                </div>
+              </div>
+            }
+            <button class="linklike reset" type="button" (click)="reset()">Reset to the default</button>
+          </div>
 
-          <div class="notice"><i class="ph ph-warning"></i><span>Today we rank on Trustpilot reputation, adjusted for how many reviews each installer has. We do not yet hold verified data on {{ unbacked() }}, so those priorities do not change the order. Use the questions under each installer to compare them yourself.</span></div>
+          <div class="notice"><i class="ph ph-warning"></i><span>We rank on what we have data for: Trustpilot, Google Maps and track record. @if (unbacked()) { We do not yet hold verified data on {{ unbacked() }}, so those do not change the order. Use the questions under each installer to compare them yourself. } @else { Ratings are adjusted so a few reviews cannot outrank thousands. }</span></div>
 
           <h2>{{ showAll() ? 'All installers with 100+ reviews' : 'Your top five' }}</h2>
           <ol class="list">
@@ -46,7 +63,7 @@ import { Installer, PRIORITIES, Priority, rank, siteUrl, mapsUrl, seaiMatch } fr
                   </div>
                   <p class="small muted"><i class="ph-fill ph-star"></i> Trustpilot <b class="num">{{ r.installer.trustpilot!.score | number: '1.1-1' }}</b> from <span class="num">{{ r.installer.trustpilot!.count | number }}</span> reviews.
                     @if (r.installer.google) { Google <b class="num">{{ r.installer.google.rating | number: '1.1-1' }}</b> from <span class="num">{{ r.installer.google.count | number }}</span>. }
-                    @if (r.backed.length) { Verified on: {{ names(r.backed) }}. }</p>
+                    </p>
                   @if (asks(); as qs) {
                     <details>
                       <summary>Questions to ask {{ r.installer.name }}</summary>
@@ -124,6 +141,13 @@ import { Installer, PRIORITIES, Priority, rank, siteUrl, mapsUrl, seaiMatch } fr
     .side { position: sticky; top: 92px; }
     @media (max-width: 960px) { .side { position: static; } }
     .qh { font-family: var(--font); font-stretch: 100%; font-weight: 650; letter-spacing: -0.01em; font-size: 1.15rem; margin: 28px 0 10px; }
+    .weights { display: grid; gap: 4px; margin-top: 12px; }
+    .wg { font-size: 0.95rem; margin: 16px 0 4px; font-weight: 650; }
+    .wrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 20px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+    .wl { display: grid; gap: 2px; }
+    .seg.lv button { padding: 6px 12px; font-size: 0.88rem; }
+    @media (max-width: 680px) { .wrow { grid-template-columns: minmax(0, 1fr); } }
+    .reset { justify-self: start; margin-top: 10px; }
     .picks { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; legend { padding: 0; margin-bottom: 10px; width: 100%; } }
     .pick { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 18px; border: 1.5px solid var(--ink-3); border-radius: var(--r-pill); cursor: pointer; font-weight: 600; background: var(--surface); input { width: 18px; height: 18px; accent-color: var(--ink); margin: 0; } }
     .pick.on { background: var(--ink); color: var(--bg); border-color: var(--ink); input { accent-color: var(--sun); } }
@@ -157,11 +181,13 @@ export class QuotePage {
   readonly r = this.store.result;
   readonly site = SITE;
   readonly priorities = PRIORITIES;
-  /** The things the user ticked. Ticked counts double; with none ticked everything counts equally. */
-  readonly picks = signal<Set<Priority>>(new Set());
-  readonly weights = computed<Record<Priority, number>>(() => {
-    const c = this.picks();
-    return Object.fromEntries(PRIORITIES.map((p) => [p.key, c.has(p.key) ? 2 : 1])) as Record<Priority, number>;
+  readonly dataCriteria = DATA_CRITERIA;
+  readonly levelOptions = LEVELS;
+  /** How much each criterion matters to the user, from 0 (skip) to 3 (top). */
+  readonly levels = signal<Record<Criterion, number>>({ ...DEFAULT_LEVELS });
+  readonly weights = computed<Record<Criterion, number>>(() => {
+    const l = this.levels();
+    return Object.fromEntries((Object.keys(l) as Criterion[]).map((k) => [k, LEVELS[l[k]].w])) as Record<Criterion, number>;
   });
   readonly picked = signal<Set<string>>(new Set());
   readonly wantsIntro = signal<boolean | null>(null);
@@ -177,22 +203,24 @@ export class QuotePage {
   readonly introFor = computed(() => this.chosen().filter((i) => INTRODUCTION_INSTALLERS.includes(i.slug)));
   readonly introNames = computed(() => this.introFor().map((i) => i.name).join(' and '));
 
+  /** Ask-the-installer priorities the user cares about, strongest first. With none set, all of them. */
+  private marked() {
+    const l = this.levels();
+    const set = PRIORITIES.filter((p) => l[p.key] > 0).sort((a, b) => l[b.key] - l[a.key]);
+    return set.length ? set : PRIORITIES;
+  }
   /** Question prompts for the priorities the user marked, so they can compare installers themselves. */
-  readonly asks = computed(() => {
-    const c = this.picks();
-    const qs = (c.size ? PRIORITIES.filter((p) => c.has(p.key)) : PRIORITIES).map((p) => p.ask);
-    return qs.length ? qs : null;
-  });
+  readonly asks = computed(() => this.marked().map((p) => p.ask));
+  /** Priorities the user cares about that we hold no verified data for, so they cannot change the order. */
   readonly unbacked = computed(() => {
     const have = new Set(this.ranked().flatMap((r) => r.backed));
-    const c = this.picks();
-    const miss = (c.size ? PRIORITIES.filter((p) => c.has(p.key)) : PRIORITIES).filter((p) => !have.has(p.key)).map((p) => p.label.toLowerCase());
-    return miss.length ? miss.join(', ') : 'none of your priorities';
+    const l = this.levels();
+    return PRIORITIES.filter((p) => l[p.key] > 0 && !have.has(p.key)).map((p) => p.label.toLowerCase()).join(', ');
   });
 
-  toggleKey(k: Priority) { this.picks.update((c) => { const n = new Set(c); n.has(k) ? n.delete(k) : n.add(k); return n; }); }
+  setLevel(k: Criterion, n: number) { this.levels.update((l) => ({ ...l, [k]: n })); }
+  reset() { this.levels.set({ ...DEFAULT_LEVELS }); }
   toggle(slug: string) { this.picked.update((s) => { const n = new Set(s); n.has(slug) ? n.delete(slug) : n.add(slug); return n; }); if (!this.introFor().length) this.wantsIntro.set(null); }
-  names(keys: Priority[]) { return keys.map((k) => PRIORITIES.find((p) => p.key === k)!.label.toLowerCase()).join(', '); }
   maps(i: Installer) { return mapsUrl(i); }
   seai(i: Installer) { return !!seaiMatch(i); }
   siteOf(i: Installer) { return siteUrl(i); }
@@ -207,7 +235,8 @@ export class QuotePage {
   private summary(): string {
     const r = this.r(), h = this.store.home(), u = this.store.usage();
     const ori = { S: 'south', SE_SW: 'south-east or south-west', E_W: 'east or west', N: 'north' }[h.orientation];
-    const top = PRIORITIES.filter((p) => this.weights()[p.key] === 2).map((p) => p.label.toLowerCase());
+    const l = this.levels();
+    const top = (Object.keys(l) as Criterion[]).filter((k) => l[k] >= 2).map((k) => criterionLabel(k).toLowerCase());
     return [
       'Solar quote request (planned with GreenWattz)',
       `Yearly electricity use: about ${Math.round(u.annualKwh)} kWh`,

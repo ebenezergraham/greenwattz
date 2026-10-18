@@ -235,20 +235,38 @@
               <button type="button" [attr.aria-pressed]="s.assumptions().tariff === 'smart'" (click)="setTariff('smart')">Smart (3 rates)</button>
             </div>
             <p class="hint">{{ tariffHint() }}</p>
+
+            <div class="presets">
+              <span class="ql" id="rp">Start from</span>
+              <div class="seg" role="group" aria-labelledby="rp">
+                @for (p of presets; track p.key) { <button type="button" [attr.aria-pressed]="presetOn(p.key)" (click)="applyPreset(p.key)">{{ p.label }}</button> }
+              </div>
+              <p class="hint">@for (p of presets; track p.key) { <span class="pl"><b>{{ p.label }}:</b> {{ presetLine(p.key) }} {{ vatMode() === 'ex' ? 'before VAT' : 'with VAT' }}. {{ p.hint }}</span> }</p>
+            </div>
+
+            <div class="presets">
+              <span class="ql" id="vm">Show prices</span>
+              <div class="seg" role="group" aria-labelledby="vm">
+                <button type="button" [attr.aria-pressed]="vatMode() === 'ex'" (click)="vatMode.set('ex')">Before VAT (as on bills)</button>
+                <button type="button" [attr.aria-pressed]="vatMode() === 'inc'" (click)="vatMode.set('inc')">Including VAT</button>
+              </div>
+            </div>
+
             <div class="rates-grid">
               @if (s.assumptions().tariff === 'flat') {
-                <div class="field"><label for="r-flat">Unit rate (c/kWh)</label><input id="r-flat" type="number" min="0" step="0.1" [value]="cents('flatRate')" (change)="setCents('flatRate', $event)" /></div>
+                <div class="field"><label for="r-flat">Unit rate (c/kWh{{ vatMode() === 'ex' ? ', before VAT' : ', with VAT' }})</label><input id="r-flat" type="number" min="0" step="0.01" [value]="shown('flatRate')" (change)="setShown('flatRate', $event)" /></div>
               } @else {
-                <div class="field"><label for="r-day">Day (c/kWh)</label><input id="r-day" type="number" min="0" step="0.1" [value]="cents('dayRate')" (change)="setCents('dayRate', $event)" /></div>
-                <div class="field"><label for="r-night">Night (c/kWh)</label><input id="r-night" type="number" min="0" step="0.1" [value]="cents('nightRate')" (change)="setCents('nightRate', $event)" /></div>
+                <div class="field"><label for="r-day">Day (c/kWh{{ vatMode() === 'ex' ? ', before VAT' : ', with VAT' }})</label><input id="r-day" type="number" min="0" step="0.01" [value]="shown('dayRate')" (change)="setShown('dayRate', $event)" /></div>
+                <div class="field"><label for="r-night">Night (c/kWh{{ vatMode() === 'ex' ? ', before VAT' : ', with VAT' }})</label><input id="r-night" type="number" min="0" step="0.01" [value]="shown('nightRate')" (change)="setShown('nightRate', $event)" /></div>
                 @if (s.assumptions().tariff === 'smart') {
-                  <div class="field"><label for="r-peak">Peak (c/kWh)</label><input id="r-peak" type="number" min="0" step="0.1" [value]="cents('peakRate')" (change)="setCents('peakRate', $event)" /></div>
+                  <div class="field"><label for="r-peak">Peak (c/kWh{{ vatMode() === 'ex' ? ', before VAT' : ', with VAT' }})</label><input id="r-peak" type="number" min="0" step="0.01" [value]="shown('peakRate')" (change)="setShown('peakRate', $event)" /></div>
                 }
               }
-              <div class="field"><label for="r-exp">Export (c/kWh)</label><input id="r-exp" type="number" min="0" step="0.1" [value]="cents('exportRate')" (change)="setCents('exportRate', $event)" /></div>
-              <div class="field"><label for="r-stand">Standing charge (€/month)</label><input id="r-stand" type="number" min="0" step="1" [value]="s.assumptions().standingChargeMonthly" (change)="setAssump('standingChargeMonthly', num($event))" /></div>
+              <div class="field"><label for="r-exp">Export (c/kWh, no VAT)</label><input id="r-exp" type="number" min="0" step="0.1" [value]="cents('exportRate')" (change)="setCents('exportRate', $event)" /></div>
+              <div class="field"><label for="r-stand">Standing charge (€/month{{ vatMode() === 'ex' ? ', before VAT' : ', with VAT' }})</label><input id="r-stand" type="number" min="0" step="0.5" [value]="standing()" (change)="setStanding($event)" /></div>
+              <div class="field"><label for="r-vat">VAT on electricity (%)</label><input id="r-vat" type="number" min="0" max="30" step="0.5" [value]="vatPct()" (change)="setVat($event)" /></div>
             </div>
-            <p class="hint">Find these on your bill. Bills often show rates before VAT, so enter them with VAT included. The starting figures are typical, not a quote. The export rate is what your supplier pays under the Clean Export Guarantee. The standing charge is only used to turn a bill into kWh.</p>
+            <p class="hint">Copy the rates from your bill as printed. Most Irish bills list them before VAT, so we add {{ vatPct() }}% VAT for you: a unit rate of {{ shown('dayRate') }}{{ vatMode() === 'ex' ? 'c before VAT is ' + cents('dayRate') + 'c with it' : 'c with VAT is ' + round1(s.assumptions().dayRate / (1 + s.assumptions().vat) * 100) + 'c before it' }}. All the calculations use prices with VAT, because that is what you pay. A supplier discount is already in the rate on your bill, or use "Below typical" to start from a 32% discount. The export rate is what your supplier pays under the Clean Export Guarantee. The standing charge is only used to turn a bill into kWh.</p>
           </div>
         </details>
 
@@ -467,6 +485,43 @@
               </dl>
             </div>
           </div>
+        </section>
+
+        <section class="grp">
+          <h2>Your electricity, with and without solar</h2>
+          <p class="answer-sm">You pay about <b class="num">{{ eur0(r().billBefore) }}</b> a year for electricity now. With this plan you would pay about <b class="num">{{ eur0(r().billAfter) }}</b>, so you keep <b class="num">{{ eur0(r().billSaving) }}</b> a year{{ r().exportIncome ? ', plus ' + eur0(r().exportIncome - r().exportTax) + ' from exports' : '' }}.</p>
+          <div class="cmp bands">
+            <div class="cmp-head" aria-hidden="true"><span>Time of use</span><span class="r">Now, kWh</span><span class="r">Now, cost</span><span class="r">With solar, kWh</span><span class="r">With solar, cost</span></div>
+            @for (b of r().byBand; track b.band) {
+              <div class="cmp-row">
+                <span class="nm"><b>{{ bandNames[b.band] }}</b></span>
+                <span class="r num" data-l="Now, kWh">{{ b.beforeKwh | number: '1.0-0' }}</span>
+                <span class="r num" data-l="Now, cost">{{ eur0(b.beforeCost) }}</span>
+                <span class="r num" data-l="With solar, kWh">{{ b.afterKwh | number: '1.0-0' }}</span>
+                <span class="r num" data-l="With solar, cost">{{ eur0(b.afterCost) }}</span>
+              </div>
+            }
+            <div class="cmp-row cur">
+              <span class="nm"><b>Total</b></span>
+              <span class="r num" data-l="Now, kWh"><b>{{ r().baselineImportKwh | number: '1.0-0' }}</b></span>
+              <span class="r num" data-l="Now, cost"><b>{{ eur0(r().billBefore) }}</b></span>
+              <span class="r num" data-l="With solar, kWh"><b>{{ r().importKwh | number: '1.0-0' }}</b></span>
+              <span class="r num" data-l="With solar, cost"><b>{{ eur0(r().billAfter) }}</b></span>
+            </div>
+          </div>
+          <p class="hint">Unit costs only. Your standing charge does not change with solar, so it is not counted here.</p>
+
+          <h3 class="wh">Where your {{ sources().demand | number: '1.0-0' }} kWh a year comes from</h3>
+          <div class="cmp src">
+            @for (x of sources().rows; track x.label) {
+              <div class="cmp-row">
+                <span class="nm"><b>{{ x.label }}</b></span>
+                <span class="r num" data-l="kWh a year">{{ x.kwh | number: '1.0-0' }} kWh</span>
+                <span class="r num" data-l="Share">{{ pc(x.share) }}</span>
+              </div>
+            }
+          </div>
+          <p class="hint">@if (r().batteryKwh) { The battery supplies about {{ r().supply.battery | number: '1.0-0' }} kWh a year, around {{ r().supply.battery / 365 | number: '1.1-1' }} kWh a day, and you still buy about {{ r().supply.gridNight | number: '1.0-0' }} kWh overnight ({{ r().supply.gridNight / 365 | number: '1.1-1' }} kWh a day). } @else { Without a battery, solar only helps while the sun is up, so you still buy about {{ r().supply.gridNight | number: '1.0-0' }} kWh overnight ({{ r().supply.gridNight / 365 | number: '1.1-1' }} kWh a day). } Times are for a typical day; night is 11pm to 8am.</p>
         </section>
 
         <section class="grp">

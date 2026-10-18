@@ -131,6 +131,8 @@ export interface Assumptions {
   peakRate: number; // EUR/kWh, 17:00-19:00, smart tariff only
   standingChargeMonthly: number; // EUR per month for standing charge and levies, used to turn a bill into kWh
   exportRate: number; // EUR/kWh
+  /** VAT added to unit rates and standing charge on an Irish electricity bill. 9% on the bill we based the presets on. */
+  vat: number;
   tariffInflation: number; // per year
   yieldPerKwp: number; // kWh per kWp per year, south, ~35 degrees
   panelWatts: number; // rated watts per panel, editable; 465 W is a common current panel
@@ -161,6 +163,7 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
   peakRate: PRICES.tariffs.peak,
   standingChargeMonthly: PRICES.tariffs.standingChargeMonthly,
   exportRate: PRICES.tariffs.export,
+  vat: 0.09,
   tariffInflation: 0.02,
   yieldPerKwp: PRICES.solar.yieldPerKwp,
   panelWatts: 465,
@@ -177,6 +180,27 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
   exportTaxRate: PRICES.tax.exportTaxRate,
   co2KgPerKwh: 0.3,
 };
+
+export type RatePresetKey = 'below' | 'typical' | 'above';
+
+/** Unit rates before VAT and the supplier discount, read from a real Irish bill (day 38.65c, night 21.25c, peak 43.4c). */
+const BILL_RATES_EX_VAT = { day: 0.3865, night: 0.2125, peak: 0.434 };
+const BILL_DISCOUNT = 0.32;
+
+export const RATE_PRESETS: { key: RatePresetKey; label: string; hint: string }[] = [
+  { key: 'below', label: 'Below typical', hint: 'A supplier plan with about a 32% discount on unit rates, as on a real bill.' },
+  { key: 'typical', label: 'Typical', hint: 'An average day and night plan, from published rates.' },
+  { key: 'above', label: 'Above typical', hint: 'Standard list rates with no discount, as on a real bill.' },
+];
+
+/** Unit rates including VAT for a preset. The flat rate follows the day rate. */
+export function ratePreset(key: RatePresetKey, vat: number): Pick<Assumptions, 'flatRate' | 'dayRate' | 'nightRate' | 'peakRate'> {
+  const t = PRICES.tariffs;
+  if (key === 'typical') return { flatRate: t.flat, dayRate: t.day, nightRate: t.night, peakRate: t.peak };
+  const f = (1 - (key === 'below' ? BILL_DISCOUNT : 0)) * (1 + vat);
+  const day = BILL_RATES_EX_VAT.day * f;
+  return { flatRate: t.flat * (day / t.day), dayRate: day, nightRate: BILL_RATES_EX_VAT.night * f, peakRate: BILL_RATES_EX_VAT.peak * f };
+}
 
 export type ObstacleKey = 'chimney' | 'skylight' | 'vent' | 'dish' | 'dormer' | 'thermal';
 export type Obstacles = Record<ObstacleKey, number>;
@@ -479,6 +503,8 @@ export interface Config {
   batteryKwh: number;
 }
 
+export interface BandFlow { band: Band; beforeKwh: number; beforeCost: number; afterKwh: number; afterCost: number }
+
 export interface Result {
   kwp: number;
   panels: number;
@@ -508,6 +534,10 @@ export interface Result {
   /** Today's price of the parts that wear out sooner than the panels, used for the replacement years in the projection. */
   inverterCost: number;
   batteryCost: number;
+  /** Where each year's electricity comes from, in kWh, by time of day (night is 11pm to 8am whatever the tariff). Solar and battery cover some; the rest is bought from the grid. */
+  supply: { direct: number; battery: number; batteryNight: number; gridDay: number; gridNight: number };
+  /** Cost and kWh by rate band, before and after solar, over a year. */
+  byBand: BandFlow[];
   /** Money in hand after 25 years once the cost, replacements and tax are counted. */
   netGain: number;
   monthlyGen: number[];
@@ -618,6 +648,9 @@ export function simulate(usage: Usage, home: HomeInputs, a: Assumptions, cfg: Co
   const cheapRate = a.nightRate;
   const gridCharges = cap > 0 && a.gridCharge && a.tariff !== 'flat' && cheapRate / a.batteryEfficiency < a.dayRate;
 
+  const zero = (): Record<Band, number> => ({ flat: 0, night: 0, day: 0, peak: 0 });
+  const yBefore = zero(), yAfter = zero();
+  let yDirect = 0, yBattery = 0, yBatteryNight = 0, yGridDay = 0, yGridNight = 0;
   let gen = 0, self = 0, exp = 0, imp = 0, baseImp = 0;
   let billBefore = 0, billAfter = 0, exportIncome = 0;
   const monthlyGen: number[] = [];
@@ -649,13 +682,16 @@ export function simulate(usage: Usage, home: HomeInputs, a: Assumptions, cfg: Co
     const gridTarget = gridCharges ? Math.min(usable, Math.max(0, needDay - Math.min(usable, surplusDay) * eff) / eff) : 0;
     let socSolar = 0, socGrid = 0;
     let dGen = 0, dSelf = 0, dExp = 0, dImp = 0, dBase = 0, dBefore = 0, dAfter = 0, dIncome = 0, dDemand = 0;
+    const bBefore = zero(), bAfter = zero();
+    let dDirect = 0, dBattery = 0, dBatteryNight = 0, dGridDay = 0, dGridNight = 0;
     for (let h = 0; h < 24; h++) {
       const g = gHour[h];
+      const band = bandOf(h, a.tariff);
       const load = usage.profile[m][h];
       const rate = rateFor(h, a);
       const cheap = bandOf(h, a.tariff) === 'night';
       dGen += g; dDemand += load;
-      dBase += load; dBefore += load * rate;
+      dBase += load; dBefore += load * rate; bBefore[band] += load;
       const direct = Math.min(g, load);
       let surplus = g - direct;
       let deficit = load - direct;
@@ -669,7 +705,7 @@ export function simulate(usage: Usage, home: HomeInputs, a: Assumptions, cfg: Co
           if (room > 0) {
             const drawn = room / eff;
             socGrid += room;
-            dImp += drawn; dAfter += drawn * rate;
+            dImp += drawn; dAfter += drawn * rate; bAfter[band] += drawn; dGridNight += drawn;
           }
         }
         if (!(gridCharges && cheap)) {
@@ -683,11 +719,16 @@ export function simulate(usage: Usage, home: HomeInputs, a: Assumptions, cfg: Co
         }
       }
       dSelf += direct + fromBatSolar;
+      dDirect += direct; dBattery += fromBat;
+      if (isNight(h)) { dBatteryNight += fromBat; dGridNight += deficit; } else dGridDay += deficit;
+      bAfter[band] += deficit;
       dExp += surplus;
       dImp += deficit;
       dAfter += deficit * rate;
       dIncome += surplus * a.exportRate;
     }
+    for (const b of ['flat', 'night', 'day', 'peak'] as Band[]) { yBefore[b] += bBefore[b] * days; yAfter[b] += bAfter[b] * days; }
+    yDirect += dDirect * days; yBattery += dBattery * days; yBatteryNight += dBatteryNight * days; yGridDay += dGridDay * days; yGridNight += dGridNight * days;
     gen += dGen * days; self += dSelf * days; exp += dExp * days; imp += dImp * days; baseImp += dBase * days;
     billBefore += dBefore * days; billAfter += dAfter * days; exportIncome += dIncome * days;
     monthlyGen.push(dGen * days);
@@ -719,6 +760,10 @@ export function simulate(usage: Usage, home: HomeInputs, a: Assumptions, cfg: Co
     grant, batteryGrant, netCost: net,
     paybackYears: benefit > 0 ? paybackFrom(flow) : Infinity,
     inverterCost, batteryCost, netGain: flow[flow.length - 1].cumulative,
+    supply: { direct: yDirect, battery: yBattery, batteryNight: yBatteryNight, gridDay: yGridDay, gridNight: yGridNight },
+    byBand: (['flat', 'night', 'day', 'peak'] as Band[]).filter((b) => yBefore[b] > 0 || yAfter[b] > 0).map((b) => ({
+      band: b, beforeKwh: yBefore[b], beforeCost: yBefore[b] * rateOfBand(b, a), afterKwh: yAfter[b], afterCost: yAfter[b] * rateOfBand(b, a),
+    })),
     monthlyGen, monthlyDemand,
     co2Tonnes: (self * a.co2KgPerKwh) / 1000,
   };

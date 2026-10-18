@@ -4,7 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
 import { PlanStore } from '../core/store';
-import { Assumptions, inverterLimitKw, siteOrientationFactor, shadingFactor, roofTypeInfo, BATTERY_PRODUCTS, BATTERY_SIZES, loanPayment, paybackRange, EXPORT_TAX_RATES, exportTaxFor, PRICES, grantEligibility, seaiGrantFor, BATTERY_GUIDE, BATTERY_OPTIONS, BATTERY_TIERS, BatteryTier, batteryPrice, HOUSE_TYPES, HouseType, OBSTACLES, ObstacleKey, ROOF_TYPES, RoofType, Storeys, Orientation, Occupancy, Shading, Scenario, Tariff, bandsOfDay, simulate, solarDay } from '../core/engine';
+import { Assumptions, RATE_PRESETS, RatePresetKey, ratePreset, inverterLimitKw, siteOrientationFactor, shadingFactor, roofTypeInfo, BATTERY_PRODUCTS, BATTERY_SIZES, loanPayment, paybackRange, EXPORT_TAX_RATES, exportTaxFor, PRICES, grantEligibility, seaiGrantFor, BATTERY_GUIDE, BATTERY_OPTIONS, BATTERY_TIERS, BatteryTier, batteryPrice, HOUSE_TYPES, HouseType, OBSTACLES, ObstacleKey, ROOF_TYPES, RoofType, Storeys, Orientation, Occupancy, Shading, Scenario, Tariff, bandsOfDay, simulate, solarDay } from '../core/engine';
 import { HdfError, parseHdf } from '../core/hdf';
 import { inferHousehold } from '../core/infer';
 import { CashChart, DayChart, Legend, MonthChart } from '../ui/charts';
@@ -47,6 +47,20 @@ export class PlanPage {
       usable: Math.round(r.batteryKwh * 0.9 * 10) / 10, eff: Math.round(a.batteryEfficiency * 100),
       sunny: this.s.dayStats().sunnyHoursPct,
     };
+  });
+  readonly bandNames: Record<string, string> = { flat: 'All day', night: 'Night (11pm to 8am)', day: 'Day', peak: 'Peak (5pm to 7pm)' };
+  /** Yearly electricity by source, as shares of what the home uses. */
+  readonly sources = computed(() => {
+    const r = this.r();
+    const demand = r.monthlyDemand.reduce((a, b) => a + b, 0) || 1;
+    const sp = r.supply;
+    const rows = [
+      { label: 'Solar, straight to the house', kwh: sp.direct },
+      ...(r.batteryKwh ? [{ label: 'Battery, in the evening', kwh: sp.battery - sp.batteryNight }, { label: 'Battery, overnight', kwh: sp.batteryNight }] : []),
+      { label: 'Bought from the grid, daytime and evening', kwh: sp.gridDay },
+      { label: 'Bought from the grid, overnight', kwh: sp.gridNight },
+    ];
+    return { demand, rows: rows.map((x) => ({ ...x, share: x.kwh / demand })) };
   });
   inverterKw() { return inverterLimitKw(this.s.home()); }
   setExportExtra(on: boolean) { this.s.chosen.set(null); this.s.patchAssumptions({ exportExtra: on }); }
@@ -117,7 +131,7 @@ export class PlanPage {
     const a = this.s.assumptions();
     const c = (n: number) => this.round1(n * 100) + 'c';
     const plan = a.tariff === 'flat' ? `One rate ${c(a.flatRate)}` : a.tariff === 'dayNight' ? `Day ${c(a.dayRate)}, night ${c(a.nightRate)}` : `Day ${c(a.dayRate)}, night ${c(a.nightRate)}, peak ${c(a.peakRate)}`;
-    return `${plan}, export ${c(a.exportRate)}`;
+    return `${plan} incl. VAT, export ${c(a.exportRate)}`;
   });
   readonly tierLine = computed(() => {
     const t = BATTERY_TIERS.find((x) => x.key === this.s.assumptions().batteryTier)!;
@@ -182,6 +196,30 @@ export class PlanPage {
   readonly medianDaily = computed(() => this.s.usage().medianDaily ?? this.s.usage().annualKwh / 365);
   readonly chartBands = computed(() => bandsOfDay(this.s.assumptions().tariff));
   readonly legend = computed<Legend[]>(() => this.s.bands().map((b) => ({ cls: b.band, text: `${b.label}, ${b.window}: ${this.round1(b.rate * 100)}c` })));
+  readonly presets = RATE_PRESETS;
+  /** Whether the rate boxes show prices before VAT (as bills do) or including it. We always calculate with VAT included. */
+  readonly vatMode = signal<'ex' | 'inc'>('ex');
+  private vatFactor() { return this.vatMode() === 'ex' ? 1 + this.s.assumptions().vat : 1; }
+  /** c/kWh for a rate in the mode shown. */
+  shown(k: 'flatRate' | 'dayRate' | 'nightRate' | 'peakRate'): number { return Math.round((this.s.assumptions()[k] / this.vatFactor()) * 10000) / 100; }
+  setShown(k: 'flatRate' | 'dayRate' | 'nightRate' | 'peakRate', e: Event) { const v = this.num(e); if (v >= 0) this.setAssump(k, (v / 100) * this.vatFactor()); }
+  /** Standing charge per month in the mode shown. */
+  standing(): number { return Math.round((this.s.assumptions().standingChargeMonthly / this.vatFactor()) * 100) / 100; }
+  setStanding(e: Event) { const v = this.num(e); if (v >= 0) this.setAssump('standingChargeMonthly', v * this.vatFactor()); }
+  vatPct() { return Math.round(this.s.assumptions().vat * 1000) / 10; }
+  setVat(e: Event) { const v = this.num(e); if (v >= 0 && v <= 30) this.setAssump('vat', v / 100); }
+  applyPreset(k: RatePresetKey) { this.s.patchAssumptions(ratePreset(k, this.s.assumptions().vat)); }
+  presetOn(k: RatePresetKey): boolean {
+    const a = this.s.assumptions(), p = ratePreset(k, a.vat);
+    const near = (x: number, y: number) => Math.abs(x - y) < 0.0005;
+    return near(a.dayRate, p.dayRate) && near(a.nightRate, p.nightRate) && near(a.peakRate, p.peakRate) && near(a.flatRate, p.flatRate);
+  }
+  /** What a preset's rates look like in the mode shown, for the button hint. */
+  presetLine(k: RatePresetKey): string {
+    const a = this.s.assumptions(), p = ratePreset(k, a.vat), f = this.vatFactor();
+    const c = (n: number) => (Math.round((n / f) * 10000) / 100) + 'c';
+    return a.tariff === 'flat' ? c(p.flatRate) : a.tariff === 'dayNight' ? `${c(p.dayRate)} day, ${c(p.nightRate)} night` : `${c(p.dayRate)} day, ${c(p.nightRate)} night, ${c(p.peakRate)} peak`;
+  }
   readonly tariffHint = computed(() => ({
     flat: 'One price for every unit, at any time of day.',
     dayNight: 'A cheaper rate from 11pm to 8am and a higher rate for the rest of the day.',

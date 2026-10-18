@@ -157,3 +157,11 @@ input.short { max-width: 200px; }
 .steps { list-style: none; margin: 16px 0; padding: 0; display: grid; gap: 22px; max-width: 70ch; h3 { font-size: 1.05rem; margin: 0 0 6px; } p { margin: 0 0 8px; } }
 .formula { padding: 10px 14px; background: var(--surface-2); border-radius: var(--r-ctl); line-height: 1.7; font-size: 0.95rem; }
 .field.watts { margin: 10px 0 4px; input { max-width: 120px; } }
+
+.answer-sm { margin: 8px 0 14px; font-size: 1.1rem; max-width: 64ch; }
+.cmp.bands .cmp-head, .cmp.bands .cmp-row { grid-template-columns: minmax(0, 1.4fr) repeat(4, minmax(0, 1fr)); }
+.cmp.src .cmp-row { grid-template-columns: minmax(0, 1.8fr) repeat(2, minmax(0, 0.8fr)); }
+.wh { font-size: 1.05rem; margin: 20px 0 6px; }
+@media (max-width: 760px) { .cmp.bands .cmp-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } .cmp.src .cmp-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.presets { display: grid; gap: 6px; margin: 12px 0; .pl { display: block; margin-top: 4px; } }
