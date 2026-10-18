@@ -27,3 +27,7 @@ Matching to rated installers is by website domain or exact company name only, so
 
 ## Refreshing ratings
 `npm run sync:ratings` updates Trustpilot and Google ratings from their APIs (needs `TRUSTPILOT_API_KEY` and/or `GOOGLE_PLACES_API_KEY`).
+
+## Automatic SEAI refresh and backup
+`.github/workflows/seai-refresh.yml` runs every Monday and tries SEAI's CSV export once. On success it validates the data (it refuses a file that is much smaller than the current one), commits `data/seai/latest.csv` plus the JSON, and triggers a deploy. Git history is the backup. If SEAI blocks the request, the site keeps serving the last good data and nothing else happens. A GitHub issue opens only if there has been no successful refresh for 90 days.
+SEAI currently serves a bot-check page to scripts, so the first successful run needs SEAI to allow it (see below) or a one-off CSV in `data/seai/latest.csv`.

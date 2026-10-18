@@ -1,0 +1,68 @@
+name: Refresh SEAI register
+
+on:
+  schedule:
+    - cron: '0 6 * * 1' # Mondays 06:00 UTC
+  workflow_dispatch:
+  push:
+    paths: ['data/seai/latest.csv']
+
+permissions:
+  contents: write
+  issues: write
+  actions: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+
+      - name: Fetch and import (scheduled runs)
+        id: fetch
+        if: github.event_name != 'push'
+        run: |
+          set +e
+          node scripts/refresh-seai.mjs
+          echo "code=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Import committed CSV (push runs)
+        if: github.event_name == 'push'
+        run: node scripts/import-seai.mjs data/seai/latest.csv
+
+      - name: Record successful check
+        if: github.event_name == 'push' || steps.fetch.outputs.code == '0'
+        run: date -u +%F > data/seai/last-success.txt
+
+      - name: Commit changes
+        id: commit
+        run: |
+          git config user.name "greenwattz-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data src/app/data/seai-registered.json
+          if git diff --cached --quiet; then echo "changed=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          if git diff --cached --name-only | grep -q '^src/'; then echo "site=true" >> "$GITHUB_OUTPUT"; fi
+          git commit -m "Update SEAI register data"
+          git push
+
+      - name: Deploy if the register changed
+        if: steps.commit.outputs.site == 'true'
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: gh workflow run firebase-hosting.yml
+
+      - name: Flag stale data (only after 90 days without a successful check)
+        if: github.event_name == 'schedule' && steps.fetch.outputs.code == '2'
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          last=$(cat data/seai/last-success.txt 2>/dev/null || echo "")
+          if [ -n "$last" ]; then
+            age=$(( ( $(date +%s) - $(date -d "$last" +%s) ) / 86400 ))
+            [ "$age" -lt 90 ] && { echo "Last success $age days ago, no action needed."; exit 0; }
+          fi
+          if [ -z "$(gh issue list --label seai-refresh --state open --json number -q '.[0].number')" ]; then
+            gh label create seai-refresh --color 0b7a62 2>/dev/null || true
+            gh issue create --label seai-refresh --title "SEAI register data is stale" \
+              --body "SEAI blocks automated downloads, and the last successful refresh was ${last:-never}. The site keeps serving the last good data. Options: ask SEAI for an allow-listed feed, or save https://www.seai.ie/export-solar?county=All&domestic_nondomestic=domestic&page&_format=csv as data/seai/latest.csv and push (the import runs automatically)."
+          fi

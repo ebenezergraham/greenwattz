@@ -8,7 +8,9 @@
 // Column names are detected by keyword, so small changes to SEAI's headers are tolerated.
 import { readFile, writeFile } from 'node:fs/promises';
 
-const src = process.argv[2];
+const force = process.argv.includes('--force');
+
+const src = process.argv.slice(2).find((a) => !a.startsWith('--'));
 if (!src) { console.error('Usage: npm run import:seai -- path/to/seai.csv'); process.exit(1); }
 
 function parseCsv(text) {
@@ -59,10 +61,24 @@ for (const r of rows) {
   });
 }
 companies.sort((a, b) => a.name.localeCompare(b.name));
+
+// Safety: refuse an import that looks truncated or broken, so a bad download never replaces good data.
+const OUT = new URL('../src/app/data/seai-registered.json', import.meta.url);
+const prev = JSON.parse(await readFile(OUT, 'utf8')).companies.length;
+if (!force && prev > 0 && companies.length < prev * 0.7) {
+  console.error(`Refusing to import: ${companies.length} companies is far fewer than the current ${prev}. Re-download, or pass --force.`);
+  process.exit(3);
+}
 const out = {
   asOf: new Date().toISOString().slice(0, 10),
   source: 'https://www.seai.ie/grants/find-a-registered-professional/solar-pv-companies',
   companies,
 };
-await writeFile(new URL('../src/app/data/seai-registered.json', import.meta.url), JSON.stringify(out, null, 2) + '\n');
+const prevFile = await readFile(OUT, 'utf8');
+const prevNames = new Set(JSON.parse(prevFile).companies.map((c) => c.name));
+const same = prev === companies.length && companies.every((c) => prevNames.has(c.name));
+// Keep the old "asOf" date when nothing changed so the file (and git) stays quiet.
+if (same) out.asOf = JSON.parse(prevFile).asOf ?? out.asOf;
+await writeFile(OUT, JSON.stringify(out, null, 2) + '\n');
+console.log(same ? 'No change in the register.' : `Register changed: ${prev} -> ${companies.length} companies.`);
 console.log(`Imported ${companies.length} companies. Columns used:`, Object.fromEntries(Object.entries(idx).map(([k, v]) => [k, head[v] ?? null])));
