@@ -793,7 +793,7 @@ export const EXPORT_TAX_RATES = [
   { rate: 0.48, label: 'Higher rate', hint: 'About 48% with USC and PRSI' },
 ];
 
-export interface Scenario extends Result { label: string; blurb: string; key: string; }
+export interface Scenario extends Result { label: string; blurb: string; key: string; meetsGoals?: boolean }
 
 export const BATTERY_OPTIONS = [0, ...BATTERY_SIZES];
 
@@ -812,7 +812,11 @@ export function buildGrid(usage: Usage, home: HomeInputs, a: Assumptions): Resul
 export const BEST_MAX_GEN_RATIO = 1.25;
 export const BOLD_MAX_GEN_RATIO = 1.5;
 
-export function pickStrategies(grid: Result[], exportExtra = false): Scenario[] {
+/** What the household wants from the system: the share of its own use covered, and the export income it hopes for. */
+export interface Goals { cover: number; exportIncome: number }
+export const DEFAULT_GOALS: Goals = { cover: 0.6, exportIncome: 0 };
+
+export function pickStrategies(grid: Result[], exportExtra = false, goals: Goals = DEFAULT_GOALS): Scenario[] {
   const value = (r: Result) => r.netGain;
   const viable = grid.filter((r) => isFinite(r.paybackYears));
   const pool = viable.length ? viable : grid;
@@ -823,13 +827,22 @@ export function pickStrategies(grid: Result[], exportExtra = false): Scenario[] 
     return ok.length ? ok : [[...pool].sort((x, y) => x.generationKwh - y.generationKwh)[0]];
   };
   const lean = [...pool].sort((x, y) => x.netCost - y.netCost)[0];
-  const best = [...within(BEST_MAX_GEN_RATIO)].sort((x, y) => value(y) - value(x))[0];
+
+  // Size from the goals, not from the roof: the cheapest panel and battery pair that covers the share of use asked
+  // for and earns the export income asked for. An export goal lifts the oversizing cap, since it asks for surplus.
+  const meets = (r: Result) => r.selfSufficiency >= goals.cover - 1e-9 && r.exportIncome >= goals.exportIncome - 1e-9;
+  const candidates = goals.exportIncome > 0 ? pool : within(BEST_MAX_GEN_RATIO);
+  const hits = candidates.filter(meets);
+  const progress = (r: Result) => Math.min(1, r.selfSufficiency / Math.max(goals.cover, 1e-9)) + (goals.exportIncome > 0 ? Math.min(1, r.exportIncome / goals.exportIncome) : 0);
+  const best = hits.length
+    ? [...hits].sort((x, y) => x.netCost - y.netCost || value(y) - value(x))[0]
+    : [...candidates].sort((x, y) => progress(y) - progress(x) || x.netCost - y.netCost)[0];
   const bold = [...within(BOLD_MAX_GEN_RATIO)].sort((x, y) => y.selfSufficiency - x.selfSufficiency || value(y) - value(x))
     .filter((r) => value(r) > -0.2 * r.netCost)[0] ?? best;
-  const mk = (r: Result, key: string, label: string, blurb: string): Scenario => ({ ...r, key, label, blurb });
+  const mk = (r: Result, key: string, label: string, blurb: string, meetsGoals?: boolean): Scenario => ({ ...r, key, label, blurb, meetsGoals });
   return [
     mk(lean, 'lean', 'Lowest outlay', 'Smallest spend that still pays its way.'),
-    mk(best, 'best', 'Best value', 'Highest return without oversizing for exports.'),
+    mk(best, 'best', 'Right size', hits.length ? 'Smallest system that meets your coverage and export goals.' : 'Gets closest to your goals within your roof and connection.', hits.length > 0),
     mk(bold, 'bold', 'Most independent', 'Covers as much of your usage as sensible.'),
   ];
 }

@@ -2,7 +2,7 @@ import { inferHousehold } from './infer';
 import { Injectable, computed, signal } from '@angular/core';
 import {
   Assumptions, Config, DEFAULT_ASSUMPTIONS, averageDay, medianFromBands, profileFromBands, bandBreakdown, dayStats, HOUSE_TYPES, HomeInputs, HouseType, NO_OBSTACLES, ObstacleKey, usableArea, obstacleArea, Usage, annualFromBill, buildGrid, cashflow,
-  estimateProfile, maxPanels, roofFitPanels, connectionLimitPanels, pickStrategies, simulate, withExtras,
+  estimateProfile, maxPanels, roofFitPanels, connectionLimitPanels, pickStrategies, DEFAULT_GOALS, Goals, simulate, withExtras,
 } from './engine';
 
 export type UsageMode = 'meter' | 'annual' | 'bill';
@@ -44,7 +44,8 @@ export class PlanStore {
   readonly dayStats = computed(() => dayStats(this.dayShape()));
   readonly maxPanels = computed(() => maxPanels(this.home(), this.assumptions()));
   readonly grid = computed(() => buildGrid(this.usage(), this.home(), this.assumptions()));
-  readonly strategies = computed(() => pickStrategies(this.grid(), this.assumptions().exportExtra));
+  readonly goals = signal<Goals>({ ...DEFAULT_GOALS });
+  readonly strategies = computed(() => pickStrategies(this.grid(), this.assumptions().exportExtra, this.goals()));
   readonly best = computed(() => this.strategies()[1]);
   readonly config = computed<Config>(() => {
     const c = this.chosen();

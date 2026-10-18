@@ -63,6 +63,9 @@ export class PlanPage {
     return { demand, rows: rows.map((x) => ({ ...x, share: x.kwh / demand })) };
   });
   inverterKw() { return inverterLimitKw(this.s.home()); }
+  setCover(e: Event) { this.s.chosen.set(null); this.s.goals.update((g) => ({ ...g, cover: this.num(e) / 100 })); }
+  setExportGoal(v: number) { this.s.chosen.set(null); this.s.goals.update((g) => ({ ...g, exportIncome: v })); }
+  readonly exportGoals = [0, 300, 600, 1000];
   setExportExtra(on: boolean) { this.s.chosen.set(null); this.s.patchAssumptions({ exportExtra: on }); }
   setWatts(e: Event) {
     const v = this.num(e);

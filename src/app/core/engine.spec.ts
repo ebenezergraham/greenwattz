@@ -3,7 +3,7 @@ import {
   PRICES, priceAgeDays, pricesAreStale,
   Eligibility, grantEligibility,
   Assumptions, BATTERY_OPTIONS, BATTERY_PRODUCTS, BATTERY_SIZES, BATTERY_TIERS, BatteryTier, batteryPrice, batteryTierInfo, BandMonthly, bandHours, medianFromBands, profileFromBands, Band, Tariff, bandBreakdown, bandOf, bandsOfDay, blendedRate, dayStats, rateFor, BEST_MAX_GEN_RATIO, CONNECTION_LIMIT_KW, HOUSE_TYPES, ROOF_TYPES, STOREY_ACCESS, roofTypeInfo, DEFAULT_ASSUMPTIONS as A, HomeInputs, MONTH_DAYS, NO_OBSTACLES, Usage,
-  annualFromBill, annualFromProfile, averageDay, buildGrid, cashflow, EXPORT_PRESETS, ratePreset, RATE_PRESETS, inverterLimitKw, loanPayment, paybackRange, exportTaxFor, EXPORT_TAX_RATES, LIFETIME, paybackFrom, project, connectionLimitPanels, costBreakdown, estimateProfile,
+  annualFromBill, annualFromProfile, averageDay, buildGrid, cashflow, DEFAULT_GOALS, Goals, EXPORT_PRESETS, ratePreset, RATE_PRESETS, inverterLimitKw, loanPayment, paybackRange, exportTaxFor, EXPORT_TAX_RATES, LIFETIME, paybackFrom, project, connectionLimitPanels, costBreakdown, estimateProfile,
   maxPanels, obstacleArea, orientationFactor, pickStrategies, roofFitPanels, seaiGrantFor, shadingFactor, simulate, solarDay,
   splitUsage, systemCost, usableArea, withExtras,
 } from './engine';
@@ -1159,5 +1159,46 @@ describe('export rate presets', () => {
     expect(premium.exportIncome).toBeGreaterThan(typical.exportIncome);
     expect(premium.exportKwh).toBeCloseTo(typical.exportKwh, 9);
     expect(premium.paybackYears).toBeLessThan(typical.paybackYears);
+  });
+});
+
+describe('sizing from goals, not from the roof', () => {
+  const rec = (roof: number, goals: Goals, a: Partial<typeof A> = {}, extra: Partial<HomeInputs> = {}) => {
+    const h = { ...home(), roofAreaM2: roof, threePhase: true, ...extra };
+    return pickStrategies(buildGrid(usage(), h, { ...A, ...a }), !!a.exportExtra, goals)[1];
+  };
+  it('recommends the same system on a bigger roof when the goals are already met', () => {
+    const small = rec(40, DEFAULT_GOALS), big = rec(110, DEFAULT_GOALS);
+    expect(big.panels).toBe(small.panels);
+    expect(big.batteryKwh).toBe(small.batteryKwh);
+  });
+  it('meets the coverage goal when it can, with the cheapest system that does', () => {
+    const r = rec(110, { cover: 0.6, exportIncome: 0 });
+    expect(r.meetsGoals).toBe(true);
+    expect(r.selfSufficiency).toBeGreaterThanOrEqual(0.6);
+  });
+  it('asks for a bigger or costlier system when more cover is wanted', () => {
+    const low = rec(110, { cover: 0.3, exportIncome: 0 }), high = rec(110, { cover: 0.7, exportIncome: 0 });
+    expect(high.netCost).toBeGreaterThan(low.netCost);
+  });
+  it('pairs panels with a battery to reach high coverage', () => {
+    expect(rec(110, { cover: 0.7, exportIncome: 0 }).batteryKwh).toBeGreaterThan(0);
+  });
+  it('adds panels to reach an export goal', () => {
+    const none = rec(110, { cover: 0.4, exportIncome: 0 }, { exportExtra: true });
+    const goal = rec(110, { cover: 0.4, exportIncome: 600 }, { exportExtra: true });
+    expect(goal.exportIncome).toBeGreaterThanOrEqual(600);
+    expect(goal.panels).toBeGreaterThanOrEqual(none.panels);
+  });
+  it('says so and gets as close as it can when the goals cannot be met', () => {
+    const r = rec(12, { cover: 0.9, exportIncome: 2000 }, {}, { threePhase: false });
+    expect(r.meetsGoals).toBe(false);
+    const all = buildGrid(usage(), { ...home(), roofAreaM2: 12, threePhase: false }, A);
+    expect(r.selfSufficiency).toBeGreaterThan(Math.min(...all.map((x) => x.selfSufficiency)));
+  });
+  it('still returns the three strategies with the right size second', () => {
+    const s = pickStrategies(buildGrid(usage(), home(), A));
+    expect(s.map((x) => x.key)).toEqual(['lean', 'best', 'bold']);
+    expect(s[1].label).toBe('Right size');
   });
 });

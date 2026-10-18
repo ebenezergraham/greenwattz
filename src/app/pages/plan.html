@@ -328,6 +328,34 @@
         <p class="sub">We tested every panel and battery combination that fits your roof. Pick a starting point, then adjust.</p>
         <estimate-note />
 
+        <section class="goals" aria-labelledby="goals-h">
+          <h2 id="goals-h">What should it do for you?</h2>
+          <p class="hint">We pick the panels and battery together to meet these, not to fill your roof.</p>
+          <div class="qs">
+            <div class="q">
+              <label class="ql" for="cover">Cover my own use</label>
+              <div class="qc">
+                <div class="slide"><input id="cover" type="range" min="20" max="90" step="5" [value]="s.goals().cover * 100" (input)="setCover($event)" /><output class="num" for="cover">{{ pc(s.goals().cover) }}</output></div>
+                <p class="hint">The share of your electricity that solar and the battery supply instead of the grid. Higher usually needs a battery.</p>
+              </div>
+            </div>
+            <div class="q">
+              <span class="ql" id="expg">Export income I want</span>
+              <div class="qc">
+                <div class="seg" role="group" aria-labelledby="expg">
+                  @for (g of exportGoals; track g) { <button type="button" [attr.aria-pressed]="s.goals().exportIncome === g" (click)="setExportGoal(g)">{{ g ? eur0(g) + ' a year' : 'None' }}</button> }
+                </div>
+                <p class="hint">Money from selling surplus power. Export is tax-free up to {{ eur0(s.assumptions().exportTaxFreePerPerson * s.home().taxpayers) }} a year for {{ s.home().taxpayers === 1 ? 'one person' : 'two people' }}. A goal here asks for more panels than your own use needs.</p>
+              </div>
+            </div>
+          </div>
+          @if (s.strategies()[1].meetsGoals) {
+            <p class="ok" role="status"><i class="ph-fill ph-check-circle"></i> The recommended option meets both goals.</p>
+          } @else {
+            <p class="hint warn" role="status">Your roof and connection cannot reach both goals. The recommended option gets closest: {{ pc(s.strategies()[1].selfSufficiency) }} of your use covered and about {{ eur0(s.strategies()[1].exportIncome) }} a year from exports.</p>
+          }
+        </section>
+
         <div class="opts" role="radiogroup" aria-label="Starting point">
           <div class="opts-head" aria-hidden="true"><span>Option</span><span>System</span><span class="r">You pay after grants</span><span class="r">Payback</span><span class="r">Covers</span></div>
           @for (x of s.strategies(); track x.key) {
@@ -635,7 +663,7 @@
             </li>
             <li>
               <h3>7. Why this many panels</h3>
-              <p>We tested every panel and battery combination your roof allows (up to {{ s.maxPanels() }} panels; your roof fits {{ s.roofFit() }} and a {{ s.home().threePhase ? 'three-phase' : 'single-phase' }} connection allows {{ s.connectionCap() }}{{ s.assumptions().exportExtra ? ', which you chose to go past' : '' }}). "Best value" is the one with the biggest 25 year gain that does not make much more than you use{{ s.assumptions().exportExtra ? ' (that limit is lifted because you plan to export)' : '' }}. "Lowest outlay" is the cheapest that still repays. "Most independent" covers the most of your use at a sensible return.</p>
+              <p>We tested every panel and battery combination your roof allows (up to {{ s.maxPanels() }} panels; your roof fits {{ s.roofFit() }} and a {{ s.home().threePhase ? 'three-phase' : 'single-phase' }} connection allows {{ s.connectionCap() }}{{ s.assumptions().exportExtra ? ', which you chose to go past' : '' }}). "Right size" is the cheapest panel and battery pair that covers {{ pc(s.goals().cover) }} of your use{{ s.goals().exportIncome ? ' and earns about ' + eur0(s.goals().exportIncome) + ' a year from exports' : '' }}, so a bigger roof does not by itself mean more panels. "Lowest outlay" is the cheapest that still repays. "Most independent" covers the most of your use at a sensible return.</p>
             </li>
           </ol>
           <p class="hint">This is a typical-day model. It does not know your weather, a particular sunny week, or how your habits change, so real results will differ. That is why we call the figures estimates.</p>
