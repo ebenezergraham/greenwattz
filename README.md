@@ -36,3 +36,11 @@ SEAI currently serves a bot-check page to scripts, so the first successful run n
 `npm test` runs the unit tests (Vitest) for the calculation engine, the ESB meter file parser, installer ranking and SEAI matching. They check energy balance (solar used + imported = demand), cost breakdown totals, SEAI grant rules, the connection-size limit, and strategy selection. The deploy workflow runs them first, so a failing calculation blocks a release.
 
 How sizing works: the recommendation never exceeds what your roof fits or what a standard home connection allows (about 6 kW single-phase, 11 kW three-phase), and "best value" will not generate more than about 125% of your yearly use, because exported power is worth less and less certain than power you use.
+
+## Keeping prices current
+Every price, grant and rate behind the estimates lives in `src/app/data/prices.json`, with a `reviewedOn` date and a list of sources. The engine reads it, the planner shows the review date next to the figures ("Estimates, not quotes"), and the `/estimates` page ("How we estimate") is generated from it.
+
+- **Update:** compare the sources in the file with current figures, edit the values, set `reviewedOn` to today, run `npm test`, push to `main`.
+- **Reminder:** `.github/workflows/price-review.yml` runs monthly and opens a GitHub issue (with the checklist and source links) once a review is within 10 days of due.
+- **Stale warning:** if the file is more than `reviewEveryDays` (60) old, the site tells visitors the prices may be out of date.
+- Battery grant: `grants.seaiBatteryConfirmed` stays `false` until SEAI confirms the 600 euro grant on seai.ie.

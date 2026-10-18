@@ -1,0 +1,32 @@
+name: Price review reminder
+
+on:
+  schedule:
+    - cron: '0 7 1 * *' # 1st of each month, 07:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - name: Build issue body if a review is due
+        id: body
+        run: |
+          set +e
+          node scripts/price-review.mjs > body.md
+          echo "code=$?" >> "$GITHUB_OUTPUT"
+      - name: Open an issue (once)
+        if: steps.body.outputs.code == '0'
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          gh label create price-review --color 0b7a62 2>/dev/null || true
+          if [ -z "$(gh issue list --label price-review --state open --json number -q '.[0].number')" ]; then
+            gh issue create --label price-review --title "Review GreenWattz price data" --body-file body.md
+          fi

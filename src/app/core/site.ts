@@ -14,3 +14,15 @@ export const SITE = {
  * introduction from an existing customer. Keep to installers whose referral rules allow it.
  */
 export const INTRODUCTION_INSTALLERS = ['pvgen'];
+
+/** What to confirm with every installer before accepting a quote. Shown in the planner and on the estimates page. */
+export const INSTALLER_CHECKLIST = [
+  'Is the quote itemised, with the panel, inverter and battery brand and model?',
+  'For a battery: the usable kWh (not nominal), the power output in kW, the warranty years and the guaranteed cycles.',
+  'Panel, inverter and workmanship warranties, in writing.',
+  'What is included: scaffolding, the ESB Networks application, SEAI grant paperwork, and commissioning.',
+  'Whether the SEAI grant is taken off the price, and whether your home qualifies.',
+  'How they estimate your savings, and which export rate and electricity price they assume.',
+  'How long the price is valid, and the payment terms.',
+  'Who you call if something fails after installation, and how quickly they respond.',
+];

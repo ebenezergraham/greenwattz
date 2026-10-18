@@ -1,0 +1,42 @@
+{
+  "reviewedOn": "2026-10-18",
+  "reviewEveryDays": 60,
+  "solar": {
+    "costBase": 2200,
+    "costPerKwp": 1250,
+    "yieldPerKwp": 920,
+    "note": "Installed price for a typical 4 kWp system is about 6,500 to 8,500 euro and 6 kWp about 9,000 to 12,000 euro before grants, at 0% VAT."
+  },
+  "grants": {
+    "seaiSolarFirst2kwpPerKwp": 700,
+    "seaiSolarNext2kwpPerKwp": 200,
+    "seaiSolarMax": 1800,
+    "seaiBattery": 600,
+    "seaiBatteryConfirmed": false
+  },
+  "tariffs": {
+    "flat": 0.34,
+    "day": 0.35,
+    "night": 0.23,
+    "peak": 0.42,
+    "export": 0.19,
+    "standingChargeMonthly": 35
+  },
+  "battery": {
+    "value": [ { "kwh": 5, "low": 4000, "high": 5200 }, { "kwh": 10, "low": 5500, "high": 7500 } ],
+    "mainstream": [ { "kwh": 5, "low": 4500, "high": 5500 }, { "kwh": 10, "low": 6500, "high": 8000 }, { "kwh": 15, "low": 8500, "high": 10500 } ],
+    "premium": [ { "kwh": 5, "low": 5000, "high": 6500 }, { "kwh": 10, "low": 7000, "high": 9000 }, { "kwh": 13.5, "low": 9000, "high": 12000 } ]
+  },
+  "sources": [
+    { "what": "Solar installed cost", "label": "Selectra Ireland, cost of solar panels", "url": "https://selectra.ie/energy/guides/solar-panels/cost" },
+    { "what": "Solar installed cost", "label": "Purevolt, solar panel cost and returns", "url": "https://www.purevolt.ie/domestic-solar/solar-panels-cost-and-returns.php" },
+    { "what": "Solar grant", "label": "SEAI, solar electricity grant", "url": "https://www.seai.ie/grants/home-energy-grants/individual-grants/solar-electricity-grant" },
+    { "what": "Battery prices by brand and size", "label": "SolarInfo.ie, solar battery storage Ireland", "url": "https://www.solarinfo.ie/solar-battery-storage" },
+    { "what": "Battery prices and sizes", "label": "Kilovolt, home battery storage guide", "url": "https://kv.ie/guides/batteries/" },
+    { "what": "Battery prices and brands", "label": "EnergyHero, solar battery cost Ireland", "url": "https://energyhero.ie/solar-battery-cost-ireland/" },
+    { "what": "Battery grant (unconfirmed)", "label": "Irish Times, battery grant expected in budget", "url": "https://www.irishtimes.com/politics/2026/09/25/grant-of-600-for-solar-panel-batteries-set-to-be-announced-in-budget/" },
+    { "what": "Export rates", "label": "Selectra Ireland, best microgeneration rates", "url": "https://selectra.ie/energy/guides/prices/best-microgeneration-rates-ireland" },
+    { "what": "Time-of-use bands", "label": "Electric Ireland, time of use tariffs", "url": "https://www.electricireland.ie/residential/help/smart-electricity-meters/time-of-use-tariffs-for-residential-customers" },
+    { "what": "Home connection limits", "label": "ESB Networks, micro-generation", "url": "https://www.esbnetworks.ie/customer-support/customer-support-queries/generator-connections/connecting-mini-generator" }
+  ]
+}

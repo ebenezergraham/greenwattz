@@ -1,12 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import {
-  Assumptions, BATTERY_OPTIONS, BEST_MAX_GEN_RATIO, CONNECTION_LIMIT_KW, DEFAULT_ASSUMPTIONS as A, HomeInputs, MONTH_DAYS, NO_OBSTACLES, Usage,
+  PRICES, priceAgeDays, pricesAreStale,
+  Assumptions, BATTERY_OPTIONS, BATTERY_SIZES, BATTERY_TIERS, BatteryTier, batteryPrice, batteryTierInfo, BandMonthly, bandHours, medianFromBands, profileFromBands, Band, Tariff, bandBreakdown, bandOf, bandsOfDay, blendedRate, dayStats, rateFor, BEST_MAX_GEN_RATIO, CONNECTION_LIMIT_KW, HOUSE_TYPES, ROOF_TYPES, STOREY_ACCESS, roofTypeInfo, DEFAULT_ASSUMPTIONS as A, HomeInputs, MONTH_DAYS, NO_OBSTACLES, Usage,
   annualFromBill, annualFromProfile, averageDay, buildGrid, cashflow, connectionLimitPanels, costBreakdown, estimateProfile,
   maxPanels, obstacleArea, orientationFactor, pickStrategies, roofFitPanels, seaiGrantFor, shadingFactor, simulate, solarDay,
   splitUsage, systemCost, usableArea, withExtras,
 } from './engine';
 
-const HOME: HomeInputs = { occupancy: 'mixed', orientation: 'S', shading: 'none', roofAreaM2: 30, obstacles: { ...NO_OBSTACLES }, threePhase: false, addEv: false, addHeatPump: false };
+const HOME: HomeInputs = { houseType: 'semi', roofType: 'pitched', storeys: 2, occupancy: 'mixed', orientation: 'S', shading: 'none', roofAreaM2: 30, obstacles: { ...NO_OBSTACLES }, threePhase: false, addEv: false, addHeatPump: false };
 const home = (p: Partial<HomeInputs> = {}): HomeInputs => ({ ...HOME, ...p, obstacles: { ...NO_OBSTACLES, ...(p.obstacles ?? {}) } });
 const usage = (kwh = 4200, occ: HomeInputs['occupancy'] = 'mixed'): Usage => ({ annualKwh: kwh, profile: estimateProfile(kwh, occ), source: 'estimate' });
 const assump = (p: Partial<Assumptions> = {}): Assumptions => ({ ...A, ...p });
@@ -86,7 +87,7 @@ describe('cost breakdown', () => {
   it('matches the cost model: base + per kWp (+ battery base + per kWh)', () => {
     const near = (a: number, b: number) => expect(Math.abs(a - b)).toBeLessThanOrEqual(10); // rounding across rows
     near(systemCost(4, 0, A), 2200 + 1250 * 4);
-    near(systemCost(4, 5, A), 2200 + 1250 * 4 + 800 + 500 * 5);
+    near(systemCost(4, 5, A), 2200 + 1250 * 4 + batteryPrice('mainstream', 5).mid);
   });
   it('lands in the published Irish ranges (4 kWp about 6.5k to 8.5k, 6 kWp about 9k to 12k)', () => {
     expect(systemCost(4, 0, A)).toBeGreaterThanOrEqual(6500);
@@ -108,7 +109,7 @@ describe('cost breakdown', () => {
   it('scales when the user edits the cost assumptions', () => {
     const base = systemCost(4, 0, A);
     expect(systemCost(4, 0, assump({ panelCostPerKwp: 2500 }))).toBeCloseTo(base + 1250 * 4, -1);
-    expect(systemCost(4, 5, assump({ batteryCostPerKwh: 1000 }))).toBeCloseTo(systemCost(4, 5, A) + 500 * 5, -1);
+    expect(systemCost(4, 5, assump({ batteryTier: 'premium' }))).toBeCloseTo(systemCost(4, 0, A) + batteryPrice('premium', 5).mid, -1);
   });
   it('result totals use the same rows and the grant comes off the typical price', () => {
     const r = simulate(usage(), home(), A, { panels: 10, batteryKwh: 0 });
@@ -352,5 +353,418 @@ describe('solar by the hour', () => {
   it('has a shorter day in December than June', () => {
     const lit = (m: number) => solarDay(h, A, 10, m).filter((v) => v > 0).length;
     expect(lit(11)).toBeLessThan(lit(5) - 5);
+  });
+});
+
+describe('house, storeys and roof type', () => {
+  const row = (rows: ReturnType<typeof costBreakdown>, key: string) => rows.find((r) => r.key === key)!.mid;
+  const site = (roofType: HomeInputs['roofType'], storeys: HomeInputs['storeys']) => ({ roofType, storeys });
+
+  it('costs less to access a bungalow and more for three storeys', () => {
+    const one = row(costBreakdown(5, 0, A, site('pitched', 1)), 'access');
+    const two = row(costBreakdown(5, 0, A, site('pitched', 2)), 'access');
+    const three = row(costBreakdown(5, 0, A, site('pitched', 3)), 'access');
+    expect(one).toBeLessThan(two);
+    expect(two).toBeLessThan(three);
+    expect(two).toBe(800); // the base two-storey scaffolding allowance
+    expect(one).toBe(Math.round(800 * STOREY_ACCESS[1]));
+  });
+  it('only storeys change the access line and only roof type changes mounting and labour', () => {
+    const base = costBreakdown(5, 0, A, site('pitched', 2));
+    const tall = costBreakdown(5, 0, A, site('pitched', 3));
+    for (const r of base) if (r.key !== 'access') expect(row(tall, r.key)).toBe(r.mid);
+    const slate = costBreakdown(5, 0, A, site('slate', 2));
+    for (const r of base) if (!['mounting', 'labour'].includes(r.key)) expect(row(slate, r.key)).toBe(r.mid);
+    expect(row(slate, 'mounting')).toBeGreaterThan(row(base, 'mounting'));
+    expect(row(slate, 'labour')).toBeGreaterThan(row(base, 'labour'));
+  });
+  it('a standard two-storey tiled roof costs the same as the base model', () => {
+    expect(systemCost(5, 0, A, site('pitched', 2))).toBe(systemCost(5, 0, A));
+  });
+  it('costs more for slate and flat roofs than for tiles, and less for metal sheet', () => {
+    const c = (t: HomeInputs['roofType']) => systemCost(5, 0, A, site(t, 2));
+    expect(c('slate')).toBeGreaterThan(c('pitched'));
+    expect(c('flat')).toBeGreaterThan(c('pitched'));
+    expect(c('metal')).toBeLessThan(c('pitched'));
+  });
+  it('keeps the breakdown rows adding up to the total with site factors applied', () => {
+    const r = simulate(usage(), home({ roofType: 'slate', storeys: 3 }), A, { panels: 10, batteryKwh: 5 });
+    expect(r.grossCost).toBe(r.breakdown.reduce((t, x) => t + x.mid, 0));
+    expect(r.grossCost).toBeGreaterThan(simulate(usage(), home(), A, { panels: 10, batteryKwh: 5 }).grossCost);
+  });
+  it('treats a flat roof as south-facing frames: direction no longer matters, yield is 95%', () => {
+    const gen = (o: HomeInputs['orientation']) => simulate(usage(), home({ roofType: 'flat', orientation: o }), A, { panels: 10, batteryKwh: 0 }).generationKwh;
+    const south = simulate(usage(), home({ orientation: 'S' }), A, { panels: 10, batteryKwh: 0 }).generationKwh;
+    expect(gen('N')).toBeCloseTo(gen('S'), 6);
+    expect(gen('E_W')).toBeCloseTo(gen('S'), 6);
+    expect(gen('S')).toBeCloseTo(south * roofTypeInfo('flat').yield, 6);
+  });
+  it('only counts about 60% of a flat roof as usable, and no other type loses area', () => {
+    expect(usableArea(home({ roofType: 'flat', roofAreaM2: 50 }))).toBeCloseTo(30, 9);
+    for (const t of ['pitched', 'slate', 'hipped', 'metal'] as const) expect(usableArea(home({ roofType: t, roofAreaM2: 50 }))).toBe(50);
+  });
+  it('applies obstacles before the flat-roof factor', () => {
+    expect(usableArea(home({ roofType: 'flat', roofAreaM2: 50, obstacles: { chimney: 1 } as any }))).toBeCloseTo((50 - 3) * 0.6, 9);
+  });
+  it('flat roof yield also applies to the hourly solar chart', () => {
+    const flat = solarDay(home({ roofType: 'flat' }), A, 10, 5).reduce((a, b) => a + b, 0);
+    const pitched = solarDay(home(), A, 10, 5).reduce((a, b) => a + b, 0);
+    expect(flat / pitched).toBeCloseTo(0.95, 6);
+  });
+  it('has a sensible starting roof area for every house type, smaller for terraces and flats', () => {
+    const size = (k: string) => HOUSE_TYPES.find((t) => t.key === k)!.roofM2;
+    expect(HOUSE_TYPES.length).toBe(5);
+    expect(size('detached')).toBeGreaterThan(size('semi'));
+    expect(size('semi')).toBeGreaterThan(size('midTerrace'));
+    expect(size('midTerrace')).toBeGreaterThan(size('apartment'));
+    for (const t of HOUSE_TYPES) expect(t.roofM2).toBeGreaterThanOrEqual(8);
+  });
+  it('defines every roof type with positive factors', () => {
+    for (const t of ROOF_TYPES) for (const v of [t.mounting, t.labour, t.yield, t.area]) expect(v).toBeGreaterThan(0);
+  });
+});
+
+describe('Irish tariff bands and rates', () => {
+  const hours = Array.from({ length: 24 }, (_, h) => h);
+  it('uses the CRU time-of-use bands: night 11pm-8am, peak 5pm-7pm, day the rest', () => {
+    const b = bandsOfDay('smart');
+    expect(hours.filter((h) => b[h] === 'night')).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 23]);
+    expect(hours.filter((h) => b[h] === 'peak')).toEqual([17, 18]);
+    expect(hours.filter((h) => b[h] === 'day')).toEqual([8, 9, 10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22]);
+  });
+  it('has no peak on a day and night plan, and one band on a flat plan', () => {
+    expect(bandsOfDay('dayNight').includes('peak')).toBe(false);
+    expect(hours.filter((h) => bandOf(h, 'dayNight') === 'night').length).toBe(9);
+    expect(new Set(bandsOfDay('flat'))).toEqual(new Set(['flat']));
+  });
+  it('charges each hour the rate of its band', () => {
+    const a = assump({ tariff: 'smart', dayRate: 0.3, nightRate: 0.2, peakRate: 0.45 });
+    expect(rateFor(3, a)).toBe(0.2);
+    expect(rateFor(12, a)).toBe(0.3);
+    expect(rateFor(17, a)).toBe(0.45);
+    expect(rateFor(18, a)).toBe(0.45);
+    expect(rateFor(19, a)).toBe(0.3);
+    expect(rateFor(23, a)).toBe(0.2);
+    expect(rateFor(5, assump({ tariff: 'flat', flatRate: 0.31 }))).toBe(0.31);
+    expect(rateFor(18, assump({ tariff: 'dayNight', dayRate: 0.3, peakRate: 0.9 }))).toBe(0.3); // peak ignored without a smart plan
+  });
+  it('prices the bill by hour for every plan type (independent recalculation)', () => {
+    const u = usage(4200, 'mixed');
+    for (const tariff of ['flat', 'dayNight', 'smart'] as Tariff[]) {
+      const a = assump({ tariff, flatRate: 0.31, dayRate: 0.33, nightRate: 0.18, peakRate: 0.44 });
+      let expected = 0;
+      u.profile.forEach((row, m) => row.forEach((kwh, h) => {
+        const rate = tariff === 'flat' ? 0.31 : isNight(h) ? 0.18 : tariff === 'smart' && h >= 17 && h < 19 ? 0.44 : 0.33;
+        expected += kwh * MONTH_DAYS[m] * rate;
+      }));
+      expect(simulate(u, home(), a, { panels: 4, batteryKwh: 0 }).billBefore).toBeCloseTo(expected, 6);
+    }
+  });
+  it('a smart plan with the same rates plus a dearer peak costs more than day and night', () => {
+    const u = usage();
+    const dn = simulate(u, home(), assump({ tariff: 'dayNight' }), { panels: 4, batteryKwh: 0 }).billBefore;
+    const sm = simulate(u, home(), assump({ tariff: 'smart' }), { panels: 4, batteryKwh: 0 }).billBefore;
+    expect(sm).toBeGreaterThan(dn);
+  });
+  it('shifts value to the evening: a battery saves more under a dearer peak rate', () => {
+    const saving = (peak: number) => simulate(usage(), home({ roofAreaM2: 60 }), assump({ tariff: 'smart', peakRate: peak }), { panels: 12, batteryKwh: 10 }).billSaving;
+    expect(saving(0.6)).toBeGreaterThan(saving(0.35));
+  });
+});
+
+describe('band breakdown shown to the user', () => {
+  const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+  const prof = estimateProfile(4200, 'mixed');
+  it.each(['flat', 'dayNight', 'smart'] as Tariff[])('adds up to the whole day and the whole bill on a %s plan', (tariff) => {
+    const a = assump({ tariff });
+    const rows = bandBreakdown(prof, a);
+    expect(sum(rows.map((r) => r.usePct))).toBeCloseTo(1, 9);
+    expect(sum(rows.map((r) => r.costPct))).toBeCloseTo(1, 9);
+    expect(sum(rows.map((r) => r.kwhPerDay))).toBeCloseTo(4200 / 365, 6);
+    expect(sum(rows.map((r) => r.hours))).toBe(24);
+    expect(sum(rows.map((r) => r.yearlyCost))).toBeCloseTo(simulate({ annualKwh: 4200, profile: prof, source: 'estimate' }, home(), a, { panels: 0, batteryKwh: 0 }).billBefore, 6);
+  });
+  it('lists night, day and peak in that order on a smart plan with the right windows', () => {
+    const rows = bandBreakdown(prof, assump({ tariff: 'smart' }));
+    expect(rows.map((r) => r.band)).toEqual(['night', 'day', 'peak']);
+    expect(rows.map((r) => r.window)).toEqual(['11pm to 8am', '8am to 5pm and 7pm to 11pm', '5pm to 7pm']);
+    expect(rows.map((r) => r.hours)).toEqual([9, 13, 2]);
+  });
+  it('shows a lower share of the bill than of the use for night, and the reverse for peak', () => {
+    const [night, , peak] = bandBreakdown(prof, assump({ tariff: 'smart' }));
+    expect(night.costPct).toBeLessThan(night.usePct);
+    expect(peak.costPct).toBeGreaterThan(peak.usePct);
+  });
+  it('describes the median day when one is given, but costs the full year', () => {
+    const flatDay = new Array(24).fill(0.25); // 6 kWh a day
+    const rows = bandBreakdown(prof, assump({ tariff: 'dayNight' }), flatDay);
+    expect(sum(rows.map((r) => r.kwhPerDay))).toBeCloseTo(6, 9);
+    expect(rows[0].kwhPerDay).toBeCloseTo(9 * 0.25, 9); // 9 night hours at 0.25 kWh
+    expect(sum(rows.map((r) => r.usePct))).toBeCloseTo(1, 9);
+    expect(sum(rows.map((r) => r.yearlyCost))).toBeGreaterThan(900); // still the full-year profile
+  });
+});
+
+describe('day statistics', () => {
+  it('finds the busiest hour, always-on load and sunny-hours share', () => {
+    const shape = new Array(24).fill(0.2);
+    shape[19] = 0.9;
+    shape[3] = 0.1;
+    for (let h = 9; h < 17; h++) shape[h] = 0.3;
+    const s = dayStats(shape);
+    expect(s.busiestHour).toBe(19);
+    expect(s.busiestKwh).toBe(0.9);
+    expect(s.baseloadWatts).toBeCloseTo(100, 9);
+    const total = shape.reduce((a, b) => a + b, 0);
+    expect(s.totalKwh).toBeCloseTo(total, 9);
+    expect(s.sunnyHoursPct).toBeCloseTo((0.3 * 8) / total, 9);
+  });
+  it('puts the busiest hour in the evening for a typical estimated home', () => {
+    const st = dayStats(averageDay(estimateProfile(4200, 'away')));
+    expect(st.busiestHour).toBeGreaterThanOrEqual(17);
+    expect(st.busiestHour).toBeLessThanOrEqual(21);
+  });
+  it('people at home use a larger share in sunny hours than people who are out', () => {
+    const share = (o: HomeInputs['occupancy']) => dayStats(averageDay(estimateProfile(4200, o))).sunnyHoursPct;
+    expect(share('home')).toBeGreaterThan(share('away'));
+  });
+});
+
+describe('bills to kWh under each plan', () => {
+  it('uses the blended unit rate for the chosen plan', () => {
+    expect(blendedRate(assump({ tariff: 'flat', flatRate: 0.4 }))).toBe(0.4);
+    expect(blendedRate(assump({ tariff: 'dayNight', dayRate: 0.4, nightRate: 0.2 }))).toBeCloseTo(0.35, 9);
+    expect(blendedRate(assump({ tariff: 'smart', dayRate: 0.4, nightRate: 0.2, peakRate: 0.5 }))).toBeCloseTo(0.2 * 0.25 + 0.5 * 0.12 + 0.4 * 0.63, 9);
+  });
+  it('converts a bill using the user\'s own standing charge and rate', () => {
+    expect(annualFromBill(100, assump({ tariff: 'flat', flatRate: 0.3, standingChargeMonthly: 25 }))).toBe(Math.round((75 * 12) / 0.3));
+  });
+  it('gives fewer kWh when the unit rate is higher', () => {
+    expect(annualFromBill(150, assump({ dayRate: 0.5 }))).toBeLessThan(annualFromBill(150, assump({ dayRate: 0.3 })));
+  });
+  it('keeps the median consistent when an EV or heat pump is added', () => {
+    const u = { ...usage(4000), median: new Array(24).fill(0.4), medianDaily: 9.6 };
+    const w = withExtras(u, home({ addEv: true }));
+    expect(w.median!.reduce((a, b) => a + b, 0)).toBeCloseTo(9.6 + 2600 / 365, 4);
+    expect(w.medianDaily).toBeCloseTo(9.6 + 2600 / 365, 6);
+    expect(withExtras(u, home()).median).toEqual(u.median);
+  });
+});
+
+describe('profiles built from daily band totals', () => {
+  const flat = (v: number) => new Array(12).fill(v);
+  const b: BandMonthly = { night: flat(5), offpeak: flat(6), peak: flat(1), hasPeak: true, medianNight: 4, medianOffpeak: 5, medianPeak: 0.8 };
+  const sumHours = (row: number[], hours: number[]) => hours.reduce((t, h) => t + row[h], 0);
+
+  it('splits the day into 9 night hours, 13 day hours and 2 peak hours, or 15 day hours with no peak register', () => {
+    const h = bandHours(true);
+    expect([h.night.length, h.offpeak.length, h.peak.length]).toEqual([9, 13, 2]);
+    expect(h.peak).toEqual([17, 18]);
+    const dn = bandHours(false);
+    expect([dn.night.length, dn.offpeak.length, dn.peak.length]).toEqual([9, 15, 0]);
+  });
+  it('keeps the measured night, day and peak totals exactly, in every month and for every household type', () => {
+    for (const occ of ['away', 'mixed', 'home'] as const) {
+      const p = profileFromBands(b, occ), h = bandHours(true);
+      for (const m of [0, 6, 11]) {
+        expect(sumHours(p[m], h.night)).toBeCloseTo(5, 9);
+        expect(sumHours(p[m], h.offpeak)).toBeCloseTo(6, 9);
+        expect(sumHours(p[m], h.peak)).toBeCloseTo(1, 9);
+      }
+      expect(annualFromProfile(p)).toBeCloseTo(12 * 365, 4);
+    }
+  });
+  it('does not put daytime use into the night hours (regression: everything landed in one hour)', () => {
+    const p = profileFromBands({ ...b, night: flat(0), peak: flat(0) }, 'mixed');
+    for (const h of bandHours(true).night) expect(p[0][h]).toBe(0);
+    expect(Math.max(...p[0])).toBeLessThan(2); // spread over many hours, never one big spike
+  });
+  it('shapes use within a band by who is home, without changing band totals', () => {
+    const away = profileFromBands(b, 'away'), home_ = profileFromBands(b, 'home');
+    expect(home_[0][12]).toBeGreaterThan(away[0][12]); // midday use is higher for people at home
+    expect(sumHours(home_[0], bandHours(true).offpeak)).toBeCloseTo(sumHours(away[0], bandHours(true).offpeak), 9);
+  });
+  it('builds the median day from the median of each band', () => {
+    const m = medianFromBands(b, 'mixed'), h = bandHours(true);
+    expect(sumHours(m, h.night)).toBeCloseTo(4, 9);
+    expect(sumHours(m, h.offpeak)).toBeCloseTo(5, 9);
+    expect(sumHours(m, h.peak)).toBeCloseTo(0.8, 9);
+  });
+  it('flows through to the rate band table with the same totals', () => {
+    const rows = bandBreakdown(profileFromBands(b, 'mixed'), assump({ tariff: 'smart' }));
+    expect(rows.map((r) => Math.round(r.kwhPerDay * 100) / 100)).toEqual([5, 6, 1]);
+    expect(rows[0].usePct).toBeCloseTo(5 / 12, 9);
+  });
+  it('reports the real yearly share of use even when the median day is skewed', () => {
+    const skewed = bandBreakdown(profileFromBands(b, 'mixed'), assump({ tariff: 'smart' }), medianFromBands({ ...b, medianNight: 1 }, 'mixed'));
+    expect(skewed[0].usePct).toBeCloseTo(5 / 12, 9); // yearly share, not the median day's
+    expect(skewed[0].kwhPerDay).toBeCloseTo(1, 9); // median per day still shown
+  });
+});
+
+describe('battery sizes and prices', () => {
+  const tiers: BatteryTier[] = ['value', 'mainstream', 'premium'];
+
+  it('offers the sizes Irish installers actually fit: 5, 10, 13.5 and 15 kWh, plus none', () => {
+    expect(BATTERY_SIZES).toEqual([5, 10, 13.5, 15]);
+    expect(BATTERY_OPTIONS).toEqual([0, 5, 10, 13.5, 15]);
+  });
+  it('has three tiers with named examples of real products', () => {
+    expect(BATTERY_TIERS.map((t) => t.key)).toEqual(tiers);
+    for (const t of BATTERY_TIERS) { expect(t.examples.length).toBeGreaterThanOrEqual(2); expect(t.blurb.length).toBeGreaterThan(10); }
+    expect(batteryTierInfo('premium').examples.join(' ')).toContain('Tesla Powerwall 3');
+    expect(batteryTierInfo('mainstream').examples.join(' ')).toContain('Huawei');
+    expect(batteryTierInfo('value').examples.join(' ')).toContain('GivEnergy');
+  });
+  const anchors = (['value', 'mainstream', 'premium'] as BatteryTier[]).flatMap((t) => PRICES.battery[t].map((a) => [t, a.kwh, a.low, a.high] as [BatteryTier, number, number, number]));
+  it.each(anchors)('%s %s kWh returns exactly the price-file range %s to %s', (tier, kwh, low, high) => {
+    const p = batteryPrice(tier, kwh);
+    expect(p.low).toBe(low);
+    expect(p.high).toBe(high);
+    expect(p.mid).toBe((low + high) / 2);
+  });
+  it('costs more for a bigger battery, in every tier and size step', () => {
+    for (const t of tiers) for (let i = 1; i < BATTERY_SIZES.length; i++)
+      expect(batteryPrice(t, BATTERY_SIZES[i]).mid).toBeGreaterThan(batteryPrice(t, BATTERY_SIZES[i - 1]).mid);
+  });
+  it('costs less per kWh as the battery gets bigger (fixed fitting costs spread out)', () => {
+    for (const t of tiers) {
+      const perKwh = (k: number) => batteryPrice(t, k).mid / k;
+      expect(perKwh(10)).toBeLessThan(perKwh(5));
+      expect(perKwh(13.5)).toBeLessThan(perKwh(5));
+    }
+  });
+  it('puts premium above mainstream above value at the common sizes', () => {
+    for (const k of [5, 10, 13.5]) {
+      expect(batteryPrice('premium', k).mid).toBeGreaterThan(batteryPrice('mainstream', k).mid);
+      expect(batteryPrice('mainstream', k).mid).toBeGreaterThan(batteryPrice('value', k).mid);
+    }
+  });
+  it('interpolates between published points and keeps low below high', () => {
+    const [a, b] = PRICES.battery.mainstream; // the 5 and 10 kWh points
+    const p = batteryPrice('mainstream', (a.kwh + b.kwh) / 2); // halfway between them
+    expect(p.low).toBe(Math.round((a.low + b.low) / 2 / 10) * 10);
+    expect(p.high).toBe(Math.round((a.high + b.high) / 2 / 10) * 10);
+    for (const t of tiers) for (const k of [3, 5, 7.5, 9.7, 13.5, 20]) { const q = batteryPrice(t, k); expect(q.low).toBeLessThan(q.high); expect(q.mid).toBeGreaterThan(q.low); }
+  });
+  it('lands in the published per-kWh ranges (about 600 to 1,100 euro per kWh at common sizes)', () => {
+    expect(batteryPrice('mainstream', 5).mid / 5).toBeGreaterThanOrEqual(800);
+    expect(batteryPrice('mainstream', 5).mid / 5).toBeLessThanOrEqual(1100);
+    expect(batteryPrice('mainstream', 10).mid / 10).toBeGreaterThanOrEqual(650);
+    expect(batteryPrice('mainstream', 10).mid / 10).toBeLessThanOrEqual(800);
+    expect(batteryPrice('premium', 13.5).mid / 13.5).toBeGreaterThanOrEqual(667);
+    expect(batteryPrice('premium', 13.5).mid / 13.5).toBeLessThanOrEqual(889);
+  });
+  it('is free for no battery', () => {
+    expect(batteryPrice('premium', 0)).toEqual({ low: 0, mid: 0, high: 0 });
+  });
+
+  it('adds the battery to the cost breakdown at the tier price, with rows that add up', () => {
+    for (const t of tiers) for (const kwh of BATTERY_SIZES) {
+      const rows = costBreakdown(5, kwh, assump({ batteryTier: t })).filter((r) => r.group === 'battery');
+      const p = batteryPrice(t, kwh);
+      expect(rows.length).toBe(2);
+      expect(rows.reduce((s, r) => s + r.mid, 0)).toBe(p.mid);
+      expect(rows.reduce((s, r) => s + r.low, 0)).toBe(p.low);
+      expect(rows.reduce((s, r) => s + r.high, 0)).toBe(p.high);
+    }
+  });
+  it('names the tier and size on the battery line', () => {
+    const row = costBreakdown(5, 10, assump({ batteryTier: 'premium' })).find((r) => r.key === 'battery')!;
+    expect(row.label).toBe('Premium battery, 10 kWh');
+    expect(row.note).toContain('Tesla');
+  });
+  it('is not affected by roof type or storeys', () => {
+    const a = costBreakdown(5, 10, A).filter((r) => r.group === 'battery').map((r) => r.mid);
+    const b = costBreakdown(5, 10, A, { roofType: 'flat', storeys: 3 }).filter((r) => r.group === 'battery').map((r) => r.mid);
+    expect(b).toEqual(a);
+  });
+  it('changes the total installed cost when the tier changes', () => {
+    const cost = (t: BatteryTier) => simulate(usage(), home(), assump({ batteryTier: t }), { panels: 10, batteryKwh: 10 }).grossCost;
+    expect(cost('premium')).toBeGreaterThan(cost('mainstream'));
+    expect(cost('mainstream')).toBeGreaterThan(cost('value'));
+    expect(cost('premium') - cost('value')).toBe(batteryPrice('premium', 10).mid - batteryPrice('value', 10).mid);
+  });
+  it('does not change what the battery does, only what it costs', () => {
+    const run = (t: BatteryTier) => simulate(usage(), home({ roofAreaM2: 60 }), assump({ batteryTier: t }), { panels: 12, batteryKwh: 10 });
+    expect(run('premium').selfUseKwh).toBeCloseTo(run('value').selfUseKwh, 9);
+    expect(run('premium').annualBenefit).toBeCloseTo(run('value').annualBenefit, 9);
+    expect(run('premium').paybackYears).toBeGreaterThan(run('value').paybackYears);
+  });
+
+  describe('optional 600 euro SEAI battery grant', () => {
+    const run = (grant: boolean, kwh: number, panels = 10) => simulate(usage(), home(), assump({ seaiBatteryGrant: grant }), { panels, batteryKwh: kwh });
+    it('is off by default because it is not confirmed', () => {
+      expect(A.seaiBatteryGrant).toBe(false);
+      expect(run(false, 10).batteryGrant).toBe(0);
+    });
+    it('takes 600 off for a battery of 5 kWh or more when switched on', () => {
+      const off = run(false, 5), on = run(true, 5);
+      expect(on.batteryGrant).toBe(600);
+      expect(on.netCost).toBe(off.netCost - 600);
+      expect(run(true, 15).batteryGrant).toBe(600);
+    });
+    it('gives nothing without a battery or without panels', () => {
+      expect(run(true, 0).batteryGrant).toBe(0);
+      expect(simulate(usage(), home(), assump({ seaiBatteryGrant: true }), { panels: 0, batteryKwh: 10 }).batteryGrant).toBe(0);
+    });
+    it('is separate from the solar grant and never makes the net cost negative', () => {
+      const r = run(true, 10);
+      expect(r.grant).toBe(seaiGrantFor(r.kwp));
+      expect(r.netCost).toBe(r.grossCost - r.grant - r.batteryGrant);
+      expect(r.netCost).toBeGreaterThanOrEqual(0);
+    });
+  });
+});
+
+describe('price data file', () => {
+  it('has a valid review date that is not in the future', () => {
+    expect(Number.isNaN(new Date(PRICES.reviewedOn).getTime())).toBe(false);
+    expect(priceAgeDays()).toBeGreaterThanOrEqual(0);
+  });
+  it('tells visitors when prices are overdue for review', () => {
+    const reviewed = new Date(PRICES.reviewedOn + 'T00:00:00Z').getTime();
+    const day = 86400000;
+    expect(pricesAreStale(new Date(reviewed + PRICES.reviewEveryDays * day))).toBe(false);
+    expect(pricesAreStale(new Date(reviewed + (PRICES.reviewEveryDays + 1) * day))).toBe(true);
+    expect(priceAgeDays(new Date(reviewed + 10 * day))).toBe(10);
+  });
+  it('lists a source for the figures and the links are web addresses', () => {
+    expect(PRICES.sources.length).toBeGreaterThanOrEqual(5);
+    for (const s of PRICES.sources) { expect(s.url).toMatch(/^https:\/\//); expect(s.label.length).toBeGreaterThan(3); }
+  });
+  it('has battery price points in ascending size order with low below high', () => {
+    for (const t of ['value', 'mainstream', 'premium'] as BatteryTier[]) {
+      const a = PRICES.battery[t];
+      expect(a.length).toBeGreaterThanOrEqual(2);
+      for (let i = 0; i < a.length; i++) {
+        expect(a[i].low).toBeLessThan(a[i].high);
+        if (i) { expect(a[i].kwh).toBeGreaterThan(a[i - 1].kwh); expect(a[i].low).toBeGreaterThan(a[i - 1].low); }
+      }
+    }
+  });
+  it('is sane: catches a typo that would change a price by an order of magnitude', () => {
+    expect(PRICES.solar.costPerKwp).toBeGreaterThan(800);
+    expect(PRICES.solar.costPerKwp).toBeLessThan(2500);
+    expect(PRICES.solar.costBase).toBeGreaterThan(1000);
+    expect(PRICES.solar.costBase).toBeLessThan(4000);
+    expect(PRICES.solar.yieldPerKwp).toBeGreaterThan(700);
+    expect(PRICES.solar.yieldPerKwp).toBeLessThan(1100);
+    for (const r of [PRICES.tariffs.flat, PRICES.tariffs.day, PRICES.tariffs.night, PRICES.tariffs.peak]) { expect(r).toBeGreaterThan(0.1); expect(r).toBeLessThan(0.8); }
+    expect(PRICES.tariffs.night).toBeLessThan(PRICES.tariffs.day);
+    expect(PRICES.tariffs.peak).toBeGreaterThan(PRICES.tariffs.day);
+    expect(PRICES.tariffs.export).toBeLessThan(PRICES.tariffs.day);
+    expect(PRICES.grants.seaiSolarMax).toBe(2 * PRICES.grants.seaiSolarFirst2kwpPerKwp + 2 * PRICES.grants.seaiSolarNext2kwpPerKwp);
+  });
+  it('feeds the engine defaults, so editing the file changes the estimates', () => {
+    expect(A.panelCostBase).toBe(PRICES.solar.costBase);
+    expect(A.panelCostPerKwp).toBe(PRICES.solar.costPerKwp);
+    expect(A.dayRate).toBe(PRICES.tariffs.day);
+    expect(A.exportRate).toBe(PRICES.tariffs.export);
+    expect(seaiGrantFor(10)).toBe(PRICES.grants.seaiSolarMax);
+  });
+  it('keeps the battery grant off by default until it is confirmed', () => {
+    expect(PRICES.grants.seaiBatteryConfirmed).toBe(false);
+    expect(A.seaiBatteryGrant).toBe(false);
   });
 });

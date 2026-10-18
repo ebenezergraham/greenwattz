@@ -29,7 +29,8 @@ import { RouterLink } from '@angular/router';
 
       <h2>Common problems</h2>
       <dl class="faq">
-        <dt>Switching supplier soon?</dt><dd>Download your file first. Recent switches can make earlier data harder to get.</dd>
+        <dt>Which file should I download?</dt><dd>The "30-minute readings in kWh" file is best because it shows each hour. We also read the "daily" file with Night, Day Peak and Day Off-Peak totals. It gives accurate night, day and peak shares but not the hour-by-hour detail, so we estimate how use spreads within each band.</dd>
+                <dt>Switching supplier soon?</dt><dd>Download your file first. Recent switches can make earlier data harder to get.</dd>
         <dt>No smart meter?</dt><dd>Use the "I know my kWh" or "Use my bill" options in the planner. Results are less precise about timing.</dd>
         <dt>The file has export rows?</dt><dd>You may already have solar or a microgeneration meter. We read the import rows only and assume no existing panels.</dd>
       </dl>

@@ -5,6 +5,7 @@ import { GuidePage } from './pages/guide';
 import { ProviderPage, ReviewsPage } from './pages/reviews';
 import { QuotePage } from './pages/quote';
 import { SeaiPage } from './pages/seai';
+import { EstimatesPage } from './pages/estimates';
 import { CookiesPage, PrivacyPage } from './pages/legal';
 
 export const routes: Routes = [
@@ -14,6 +15,7 @@ export const routes: Routes = [
   { path: 'reviews', component: ReviewsPage, title: 'Solar installer reviews | GreenWattz' },
   { path: 'reviews/:slug', component: ProviderPage, title: 'Installer reviews | GreenWattz' },
   { path: 'seai-installers', component: SeaiPage, title: 'SEAI registered solar companies | GreenWattz' },
+  { path: 'estimates', component: EstimatesPage, title: 'How we estimate | GreenWattz' },
   { path: 'quote', component: QuotePage, title: 'Find installers | GreenWattz' },
   { path: 'privacy', component: PrivacyPage, title: 'Privacy policy | GreenWattz' },
   { path: 'cookies', component: CookiesPage, title: 'Cookie policy | GreenWattz' },

@@ -2,7 +2,10 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
 import { PlanStore } from '../core/store';
-import { OBSTACLES } from '../core/engine';
+import { EstimateNote } from '../ui/estimate-note';
+import { HOUSE_TYPES, OBSTACLES, roofTypeInfo } from '../core/engine';
+
+const HOUSE_LABEL = Object.fromEntries(HOUSE_TYPES.map((t) => [t.key, t.label.toLowerCase()])) as Record<string, string>;
 import { INTRODUCTION_INSTALLERS, SITE } from '../core/site';
 import { Installer, PRIORITIES, Priority, rank, siteUrl, mapsUrl, seaiMatch } from '../core/installers';
 
@@ -14,11 +17,12 @@ const LEVELS = [
 
 @Component({
   selector: 'page-quote',
-  imports: [RouterLink, DecimalPipe],
+  imports: [RouterLink, DecimalPipe, EstimateNote],
   template: `
     <div class="wrap page">
       <h1>Find installers to quote</h1>
       <p class="lead">Tell us what matters to you and we will shortlist five SEAI-registered installers worth asking for a quote.</p>
+      <estimate-note />
 
       <div class="grid">
         <section class="main">
@@ -202,11 +206,12 @@ export class QuotePage {
       'Solar quote request (planned with GreenWattz)',
       `Yearly electricity use: about ${Math.round(u.annualKwh)} kWh`,
       `Suggested system: ${r.panels} panels (${r.kwp.toFixed(1)} kWp)${r.batteryKwh ? ' with a ' + r.batteryKwh + ' kWh battery' : ', no battery'}`,
+      `Home: ${HOUSE_LABEL[h.houseType]}, ${h.storeys === 3 ? '3 or more storeys' : h.storeys + ' storey' + (h.storeys > 1 ? 's' : '')}, ${roofTypeInfo(h.roofType).label.toLowerCase()} roof`,
       `Roof: faces ${ori}, shade ${h.shading}, about ${Math.round(this.store.usableArea())} m2 usable after obstacles${this.obstacleText()}`,
       `Supply: ${h.threePhase ? 'three-phase' : 'single-phase'}`,
       `Planning to add: ${[h.addEv && 'EV', h.addHeatPump && 'heat pump'].filter(Boolean).join(' and ') || 'nothing yet'}`,
       `Most important to me: ${top.length ? top.join(', ') : 'a balanced quote'}`,
-      'Please itemise the quote, list panel, inverter and battery brands, and give warranty lengths in writing.',
+      'These figures are planning estimates, not a quotation. Please quote against your own survey, itemise it, list panel, inverter and battery brands, and give warranty lengths in writing.',
     ].join('\n');
   }
   async copy() {
