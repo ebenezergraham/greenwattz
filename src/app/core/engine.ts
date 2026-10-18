@@ -14,7 +14,7 @@ export interface PriceData {
   grants: { seaiSolarFirst2kwpPerKwp: number; seaiSolarNext2kwpPerKwp: number; seaiSolarMax: number; seaiBattery: number; seaiBatteryConfirmed: boolean; seaiSolarBuiltBefore: number; seaiBatteryBuiltBefore: number; seaiBatteryMinKwh: number; seaiBatteryOpened: string; seaiEnhancedMax: number };
   links: { solarGrant: string; batteryGrant: string; enhanced: string; howToApply: string; installers: string; terms: string; govEnergyUpgrades: string };
   tax: { exportExemptionPerPerson: number; exportExemptionInForcePerPerson: number; exportTaxRate: number; note: string };
-  tariffs: { flat: number; day: number; night: number; peak: number; export: number; standingChargeMonthly: number };
+  tariffs: { flat: number; day: number; night: number; peak: number; export: number; exportPremium: number; standingChargeMonthly: number };
   battery: Record<'value' | 'mainstream' | 'premium', { kwh: number; low: number; high: number }[]>;
   sources: PriceSource[];
 }
@@ -180,6 +180,14 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
   exportTaxRate: PRICES.tax.exportTaxRate,
   co2KgPerKwh: 0.3,
 };
+
+export type ExportPresetKey = 'typical' | 'premium';
+
+/** Export rates in euro per kWh. Typical is the average supplier rate; premium is the best rate some suppliers pay. */
+export const EXPORT_PRESETS: { key: ExportPresetKey; label: string; rate: number; hint: string }[] = [
+  { key: 'typical', label: 'Typical', rate: PRICES.tariffs.export, hint: 'The average rate suppliers pay under the Clean Export Guarantee.' },
+  { key: 'premium', label: 'Premium', rate: PRICES.tariffs.exportPremium, hint: 'The best rate some suppliers pay, often tied to taking their electricity too.' },
+];
 
 export type RatePresetKey = 'below' | 'typical' | 'above';
 

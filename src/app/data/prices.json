@@ -25,6 +25,7 @@
     "night": 0.23,
     "peak": 0.42,
     "export": 0.19,
+    "exportPremium": 0.31,
     "standingChargeMonthly": 35
   },
   "battery": {

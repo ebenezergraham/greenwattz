@@ -4,7 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
 import { PlanStore } from '../core/store';
-import { Assumptions, RATE_PRESETS, RatePresetKey, ratePreset, inverterLimitKw, siteOrientationFactor, shadingFactor, roofTypeInfo, BATTERY_PRODUCTS, BATTERY_SIZES, loanPayment, paybackRange, EXPORT_TAX_RATES, exportTaxFor, PRICES, grantEligibility, seaiGrantFor, BATTERY_GUIDE, BATTERY_OPTIONS, BATTERY_TIERS, BatteryTier, batteryPrice, HOUSE_TYPES, HouseType, OBSTACLES, ObstacleKey, ROOF_TYPES, RoofType, Storeys, Orientation, Occupancy, Shading, Scenario, Tariff, bandsOfDay, simulate, solarDay } from '../core/engine';
+import { Assumptions, EXPORT_PRESETS, RATE_PRESETS, RatePresetKey, ratePreset, inverterLimitKw, siteOrientationFactor, shadingFactor, roofTypeInfo, BATTERY_PRODUCTS, BATTERY_SIZES, loanPayment, paybackRange, EXPORT_TAX_RATES, exportTaxFor, PRICES, grantEligibility, seaiGrantFor, BATTERY_GUIDE, BATTERY_OPTIONS, BATTERY_TIERS, BatteryTier, batteryPrice, HOUSE_TYPES, HouseType, OBSTACLES, ObstacleKey, ROOF_TYPES, RoofType, Storeys, Orientation, Occupancy, Shading, Scenario, Tariff, bandsOfDay, simulate, solarDay } from '../core/engine';
 import { HdfError, parseHdf } from '../core/hdf';
 import { inferHousehold } from '../core/infer';
 import { CashChart, DayChart, Legend, MonthChart } from '../ui/charts';
@@ -197,6 +197,8 @@ export class PlanPage {
   readonly chartBands = computed(() => bandsOfDay(this.s.assumptions().tariff));
   readonly legend = computed<Legend[]>(() => this.s.bands().map((b) => ({ cls: b.band, text: `${b.label}, ${b.window}: ${this.round1(b.rate * 100)}c` })));
   readonly presets = RATE_PRESETS;
+  readonly exportPresets = EXPORT_PRESETS;
+  exportPresetOn(rate: number): boolean { return Math.abs(this.s.assumptions().exportRate - rate) < 0.0005; }
   /** Whether the rate boxes show prices before VAT (as bills do) or including it. We always calculate with VAT included. */
   readonly vatMode = signal<'ex' | 'inc'>('ex');
   private vatFactor() { return this.vatMode() === 'ex' ? 1 + this.s.assumptions().vat : 1; }

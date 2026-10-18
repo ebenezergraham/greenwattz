@@ -266,6 +266,13 @@
               <div class="field"><label for="r-stand">Standing charge (€/month{{ vatMode() === 'ex' ? ', before VAT' : ', with VAT' }})</label><input id="r-stand" type="number" min="0" step="0.5" [value]="standing()" (change)="setStanding($event)" /></div>
               <div class="field"><label for="r-vat">VAT on electricity (%)</label><input id="r-vat" type="number" min="0" max="30" step="0.5" [value]="vatPct()" (change)="setVat($event)" /></div>
             </div>
+            <div class="presets">
+              <span class="ql" id="ep">Export rate</span>
+              <div class="seg" role="group" aria-labelledby="ep">
+                @for (x of exportPresets; track x.key) { <button type="button" [attr.aria-pressed]="exportPresetOn(x.rate)" (click)="setAssump('exportRate', x.rate)">{{ x.label }} {{ x.rate * 100 | number: '1.0-1' }}c</button> }
+              </div>
+              <p class="hint">@for (x of exportPresets; track x.key) { <span class="pl"><b>{{ x.label }}:</b> {{ x.hint }}</span> }</p>
+            </div>
             <p class="hint">Copy the rates from your bill as printed. Most Irish bills list them before VAT, so we add {{ vatPct() }}% VAT for you: a unit rate of {{ shown('dayRate') }}{{ vatMode() === 'ex' ? 'c before VAT is ' + cents('dayRate') + 'c with it' : 'c with VAT is ' + round1(s.assumptions().dayRate / (1 + s.assumptions().vat) * 100) + 'c before it' }}. All the calculations use prices with VAT, because that is what you pay. A supplier discount is already in the rate on your bill, or use "Below typical" to start from a 32% discount. The export rate is what your supplier pays under the Clean Export Guarantee. The standing charge is only used to turn a bill into kWh.</p>
           </div>
         </details>
@@ -564,6 +571,11 @@
           <p class="hint">Surplus power goes to the grid and your supplier pays for it. Export income is tax-free up to an allowance for each person on the bill. Above that, tax is due.</p>
           <div class="exp-controls">
             <div class="field"><label for="x-rate">Export rate (c/kWh)</label><input id="x-rate" type="number" min="0" step="0.1" [value]="cents('exportRate')" (change)="setCents('exportRate', $event)" /></div>
+            <div class="field"><span class="lbl" id="x-pre">Start from</span>
+              <div class="seg" role="group" aria-labelledby="x-pre">
+                @for (x of exportPresets; track x.key) { <button type="button" [attr.aria-pressed]="exportPresetOn(x.rate)" (click)="setAssump('exportRate', x.rate)">{{ x.label }} {{ x.rate * 100 | number: '1.0-1' }}c</button> }
+              </div>
+            </div>
             <div class="field"><span class="lbl" id="x-ppl">People on the bill</span>
               <div class="seg" role="group" aria-labelledby="x-ppl">
                 <button type="button" [attr.aria-pressed]="s.home().taxpayers === 1" (click)="setPayers(1)">One</button>

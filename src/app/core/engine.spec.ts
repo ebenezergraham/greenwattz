@@ -3,7 +3,7 @@ import {
   PRICES, priceAgeDays, pricesAreStale,
   Eligibility, grantEligibility,
   Assumptions, BATTERY_OPTIONS, BATTERY_PRODUCTS, BATTERY_SIZES, BATTERY_TIERS, BatteryTier, batteryPrice, batteryTierInfo, BandMonthly, bandHours, medianFromBands, profileFromBands, Band, Tariff, bandBreakdown, bandOf, bandsOfDay, blendedRate, dayStats, rateFor, BEST_MAX_GEN_RATIO, CONNECTION_LIMIT_KW, HOUSE_TYPES, ROOF_TYPES, STOREY_ACCESS, roofTypeInfo, DEFAULT_ASSUMPTIONS as A, HomeInputs, MONTH_DAYS, NO_OBSTACLES, Usage,
-  annualFromBill, annualFromProfile, averageDay, buildGrid, cashflow, ratePreset, RATE_PRESETS, inverterLimitKw, loanPayment, paybackRange, exportTaxFor, EXPORT_TAX_RATES, LIFETIME, paybackFrom, project, connectionLimitPanels, costBreakdown, estimateProfile,
+  annualFromBill, annualFromProfile, averageDay, buildGrid, cashflow, EXPORT_PRESETS, ratePreset, RATE_PRESETS, inverterLimitKw, loanPayment, paybackRange, exportTaxFor, EXPORT_TAX_RATES, LIFETIME, paybackFrom, project, connectionLimitPanels, costBreakdown, estimateProfile,
   maxPanels, obstacleArea, orientationFactor, pickStrategies, roofFitPanels, seaiGrantFor, shadingFactor, simulate, solarDay,
   splitUsage, systemCost, usableArea, withExtras,
 } from './engine';
@@ -1143,5 +1143,21 @@ describe('rate presets and VAT', () => {
     const hi = simulate(usage(), home(), { ...A, ...ratePreset('above', 0.09) }, { panels: 10, batteryKwh: 0 });
     expect(lo.billBefore).toBeLessThan(hi.billBefore);
     expect(lo.paybackYears).toBeGreaterThan(hi.paybackYears);
+  });
+});
+
+describe('export rate presets', () => {
+  it('has a typical average and a premium rate', () => {
+    expect(EXPORT_PRESETS.map((x) => x.key)).toEqual(['typical', 'premium']);
+    expect(EXPORT_PRESETS[0].rate).toBe(A.exportRate);
+    expect(EXPORT_PRESETS[1].rate).toBeCloseTo(0.31, 9);
+    expect(EXPORT_PRESETS[1].rate).toBeGreaterThan(EXPORT_PRESETS[0].rate);
+  });
+  it('pays more export income at the premium rate, and shortens payback', () => {
+    const run = (rate: number) => simulate(usage(), home(), { ...A, exportRate: rate }, { panels: 12, batteryKwh: 0 });
+    const typical = run(EXPORT_PRESETS[0].rate), premium = run(EXPORT_PRESETS[1].rate);
+    expect(premium.exportIncome).toBeGreaterThan(typical.exportIncome);
+    expect(premium.exportKwh).toBeCloseTo(typical.exportKwh, 9);
+    expect(premium.paybackYears).toBeLessThan(typical.paybackYears);
   });
 });
