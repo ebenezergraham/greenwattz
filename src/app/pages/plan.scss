@@ -153,3 +153,7 @@ input.short { max-width: 200px; }
 
 .prod { list-style: none; margin: 12px 0; padding: 0; display: grid; li { display: grid; gap: 2px; padding: 10px 0; border-top: 1px solid var(--line); } b { font-weight: 650; } }
 .ql.sub { display: block; margin-top: 14px; padding-top: 0; }
+
+.steps { list-style: none; margin: 16px 0; padding: 0; display: grid; gap: 22px; max-width: 70ch; h3 { font-size: 1.05rem; margin: 0 0 6px; } p { margin: 0 0 8px; } }
+.formula { padding: 10px 14px; background: var(--surface-2); border-radius: var(--r-ctl); line-height: 1.7; font-size: 0.95rem; }
+.field.watts { margin: 10px 0 4px; input { max-width: 120px; } }

@@ -4,7 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
 import { PlanStore } from '../core/store';
-import { Assumptions, inverterLimitKw, BATTERY_PRODUCTS, BATTERY_SIZES, loanPayment, paybackRange, EXPORT_TAX_RATES, exportTaxFor, PRICES, grantEligibility, seaiGrantFor, BATTERY_GUIDE, BATTERY_OPTIONS, BATTERY_TIERS, BatteryTier, batteryPrice, HOUSE_TYPES, HouseType, OBSTACLES, ObstacleKey, ROOF_TYPES, RoofType, Storeys, Orientation, Occupancy, Shading, Scenario, Tariff, bandsOfDay, simulate, solarDay } from '../core/engine';
+import { Assumptions, inverterLimitKw, siteOrientationFactor, shadingFactor, roofTypeInfo, BATTERY_PRODUCTS, BATTERY_SIZES, loanPayment, paybackRange, EXPORT_TAX_RATES, exportTaxFor, PRICES, grantEligibility, seaiGrantFor, BATTERY_GUIDE, BATTERY_OPTIONS, BATTERY_TIERS, BatteryTier, batteryPrice, HOUSE_TYPES, HouseType, OBSTACLES, ObstacleKey, ROOF_TYPES, RoofType, Storeys, Orientation, Occupancy, Shading, Scenario, Tariff, bandsOfDay, simulate, solarDay } from '../core/engine';
 import { HdfError, parseHdf } from '../core/hdf';
 import { inferHousehold } from '../core/infer';
 import { CashChart, DayChart, Legend, MonthChart } from '../ui/charts';
@@ -31,8 +31,29 @@ export class PlanPage {
   readonly products = BATTERY_PRODUCTS;
   readonly lastBattery = signal(10);
   readonly hasBattery = computed(() => this.cfg().batteryKwh > 0);
+  /** The figures behind the "How we worked this out" section, using the user's own numbers. */
+  readonly walk = computed(() => {
+    const a = this.s.assumptions(), h = this.s.home(), r = this.r(), u = this.s.usage();
+    const ori = siteOrientationFactor(h), shade = shadingFactor(h.shading);
+    const withShade = r.kwp * a.yieldPerKwp * shade;
+    const raw = withShade * ori;
+    const oriName = h.roofType === 'flat' ? 'a flat roof' : ({ S: 'south', SE_SW: 'south-east or south-west', E_W: 'east or west', N: 'north' } as const)[h.orientation];
+    const tariff = a.tariff === 'flat' ? `a flat ${this.cents('flatRate')}c` : a.tariff === 'dayNight' ? `day ${this.cents('dayRate')}c and night ${this.cents('nightRate')}c` : `day ${this.cents('dayRate')}c, night ${this.cents('nightRate')}c and peak ${this.cents('peakRate')}c`;
+    const source = u.source === 'estimate' ? 'your bill or yearly figure, shaped into a typical day for your household' : 'your meter file, using your own median day';
+    return {
+      ori, shade, withShade, raw, oriName, tariff, source,
+      yield: a.yieldPerKwp, watts: a.panelWatts, june: r.monthlyGen[5], dec: r.monthlyGen[11],
+      clipped: Math.max(0, raw - r.generationKwh), limit: inverterLimitKw(h),
+      usable: Math.round(r.batteryKwh * 0.9 * 10) / 10, eff: Math.round(a.batteryEfficiency * 100),
+      sunny: this.s.dayStats().sunnyHoursPct,
+    };
+  });
   inverterKw() { return inverterLimitKw(this.s.home()); }
   setExportExtra(on: boolean) { this.s.chosen.set(null); this.s.patchAssumptions({ exportExtra: on }); }
+  setWatts(e: Event) {
+    const v = this.num(e);
+    if (v >= 250 && v <= 700) this.s.patchAssumptions({ panelWatts: Math.round(v) });
+  }
   setGridCharge(on: boolean) { this.s.patchAssumptions({ gridCharge: on }); }
   gridChargeHint(): string {
     const a = this.s.assumptions();
@@ -71,9 +92,9 @@ export class PlanPage {
   bump(k: ObstacleKey, d: number, max: number) { this.s.setObstacle(k, Math.min(max, this.count(k) + d)); }
 
   readonly oriHints: Record<Orientation, string> = {
-    S: 'Best output.',
-    SE_SW: 'About 5% less than south.',
-    E_W: 'About 18% less, but spread across the day.',
+    S: 'Best output. The baseline for the calculation.',
+    SE_SW: 'About 5% less than south. Applied to every panel in the calculation.',
+    E_W: 'About 18% less than south, applied to every panel in the calculation, but spread across the day.',
     N: 'Poor output and rarely advised.',
   };
   readonly occHints: Record<Occupancy, string> = {

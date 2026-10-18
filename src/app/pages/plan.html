@@ -343,6 +343,8 @@
               <label class="ql" for="panels">Solar panels</label>
               <div class="qc">
                 <div class="slide"><input id="panels" type="range" min="2" [max]="s.maxPanels()" step="1" [value]="cfg().panels" (input)="setPanels($event)" /><output class="num" for="panels">{{ cfg().panels }}</output></div>
+                <div class="field watts"><label for="watts">Watts per panel</label><input id="watts" type="number" min="250" max="700" step="5" [value]="s.assumptions().panelWatts" (change)="setWatts($event)" /></div>
+                <p class="hint">Modern panels are about 400 to 500 W; we start at 465 W. Check the model on your quote. More watts per panel means fewer panels for the same kWp, but the roof area per panel stays about {{ s.assumptions().panelAreaM2 }} m².</p>
                 <p class="hint num">{{ r().kwp | number: '1.2-2' }} <a routerLink="/glossary" fragment="kwp">kWp</a>, about {{ cfg().panels * s.assumptions().panelAreaM2 }} m² of roof. Most Irish homes install 8 to 14 panels. Your roof fits up to {{ s.maxPanels() }}.</p>
               </div>
             </div>
@@ -529,6 +531,47 @@
             <div class="cmp-row cur"><span class="nm"><b>You keep</b></span>@for (x of exportView(); track x.people) { <span class="r num" [attr.data-l]="x.people === 1 ? 'One person' : 'Two people'"><b>{{ eur0(x.kept) }}</b></span> }</div>
           </div>
           <p class="hint">Two people on the bill keep {{ eur0(exportView()[1].kept - exportView()[0].kept) }} more a year{{ exportView()[1].kept - exportView()[0].kept ? '' : ' (your export income is within one allowance, so it makes no difference)' }}. The allowance is {{ eur0(s.assumptions().exportTaxFreePerPerson) }} each as modelled. Check <a href="https://www.revenue.ie" target="_blank" rel="noopener noreferrer">Revenue</a> for the rules that apply to you.</p>
+        </section>
+
+        <section class="grp walk">
+          <h2>How we worked this out</h2>
+          <p class="hint">Every figure above comes from these steps, using your own answers. Change an answer and the numbers here change with it.</p>
+          <ol class="steps">
+            <li>
+              <h3>1. Your electricity use</h3>
+              <p>You use about <b class="num">{{ s.usage().annualKwh | number: '1.0-0' }} kWh</b> a year. We built a typical day for each month from {{ walk().source }}. Only <b class="num">{{ pc(walk().sunny) }}</b> of your use falls between 9am and 5pm, when panels produce the most.</p>
+            </li>
+            <li>
+              <h3>2. What your panels produce</h3>
+              <p class="formula num">{{ r().panels }} panels x {{ walk().watts }} W = {{ r().kwp | number: '1.2-2' }} kWp<br />{{ r().kwp | number: '1.2-2' }} kWp x {{ walk().yield }} kWh per kWp (south, no shade) = {{ r().kwp * walk().yield | number: '1.0-0' }} kWh<br />x {{ walk().ori | number: '1.2-2' }} for a roof facing {{ walk().oriName }}{{ walk().ori < 1 ? ' (' + pc(1 - walk().ori) + ' less than south)' : '' }}<br />x {{ walk().shade | number: '1.2-2' }} for {{ s.home().shading === 'none' ? 'no shade' : s.home().shading + ' shade' }}<br /><b>= {{ walk().raw | number: '1.0-0' }} kWh a year</b>@if (walk().clipped > 1) { <br />less {{ walk().clipped | number: '1.0-0' }} kWh lost above the {{ walk().limit }} kW inverter limit = <b>{{ r().generationKwh | number: '1.0-0' }} kWh</b> }</p>
+              <p>The roof direction and shade factors are applied to every panel, so they change how many panels pay off, not just the total. Output is then spread across the months (June makes about <span class="num">{{ walk().june | number: '1.0-0' }} kWh</span>, December about <span class="num">{{ walk().dec | number: '1.0-0' }} kWh</span>) and across the daylight hours of each month.</p>
+            </li>
+            <li>
+              <h3>3. Matching it to your day, hour by hour</h3>
+              <p>For a typical day in each month, every hour goes like this: panels power your home first. @if (r().batteryKwh) { Extra power charges the battery ({{ r().batteryKwh }} kWh, of which we use {{ walk().usable }} kWh and lose {{ 100 - walk().eff }}% round trip), and the battery covers later use. @if (s.assumptions().gridCharge) { Overnight it also tops up from the grid at the night rate, only as far as the next day needs. } } Whatever is left is exported, and anything still missing is bought from the grid.</p>
+              <p class="formula num">Used at home: {{ r().selfUseKwh | number: '1.0-0' }} kWh ({{ pc(r().selfConsumption) }} of what you make)<br />Exported: {{ r().exportKwh | number: '1.0-0' }} kWh<br />Still bought: {{ r().importKwh | number: '1.0-0' }} kWh (was {{ r().baselineImportKwh | number: '1.0-0' }} kWh)</p>
+            </li>
+            <li>
+              <h3>4. Your bill and export income</h3>
+              <p>We price each hour at the rate for that hour ({{ walk().tariff }}).</p>
+              <p class="formula num">Bill before solar: {{ eur0(r().billBefore) }}<br />Bill after solar: {{ eur0(r().billAfter) }}<br />Saving: {{ eur0(r().billSaving) }}<br />Export income: {{ r().exportKwh | number: '1.0-0' }} kWh x {{ cents('exportRate') }}c = {{ eur0(r().exportIncome) }}<br />Tax-free allowance: {{ eur0(r().exportTaxFree) }} ({{ s.home().taxpayers }} {{ s.home().taxpayers === 1 ? 'person' : 'people' }}){{ r().exportTax ? '; tax ' + pc(s.assumptions().exportTaxRate) + ' on the rest = ' + eur0(r().exportTax) : '; no tax due' }}<br /><b>Yearly benefit: {{ eur0(r().annualBenefit) }}</b></p>
+              <p>Standing charges are not counted, because solar does not change them.</p>
+            </li>
+            <li>
+              <h3>5. What it costs</h3>
+              <p class="formula num">Installed: {{ eur0(r().grossCost) }} (typical range {{ eur0(r().grossLow) }} to {{ eur0(r().grossHigh) }})<br />Less SEAI solar grant: {{ eur0(r().grant) }}<br />Less SEAI battery grant: {{ eur0(r().batteryGrant) }}<br /><b>You pay: {{ eur0(r().netCost) }}</b></p>
+              <p>The cost is a base amount plus a price per kWp, adjusted for your roof type and storeys, and split into the items under "Where the money goes".</p>
+            </li>
+            <li>
+              <h3>6. Payback and 25 years</h3>
+              <p>Year by year, your panels lose 0.5% of output, your bill saving rises {{ pc(s.assumptions().tariffInflation) }} with prices, export income stays flat, and the inverter{{ r().batteryKwh ? ' and battery are' : ' is' }} replaced at year 13{{ r().batteryKwh ? ' and 15' : '' }}. Payback is the point where the running total reaches zero: <b class="num">{{ payback(r().paybackYears) }}</b>. After 25 years you are about <b class="num">{{ eur0(r().netGain) }}</b> ahead.</p>
+            </li>
+            <li>
+              <h3>7. Why this many panels</h3>
+              <p>We tested every panel and battery combination your roof allows (up to {{ s.maxPanels() }} panels; your roof fits {{ s.roofFit() }} and a {{ s.home().threePhase ? 'three-phase' : 'single-phase' }} connection allows {{ s.connectionCap() }}{{ s.assumptions().exportExtra ? ', which you chose to go past' : '' }}). "Best value" is the one with the biggest 25 year gain that does not make much more than you use{{ s.assumptions().exportExtra ? ' (that limit is lifted because you plan to export)' : '' }}. "Lowest outlay" is the cheapest that still repays. "Most independent" covers the most of your use at a sensible return.</p>
+            </li>
+          </ol>
+          <p class="hint">This is a typical-day model. It does not know your weather, a particular sunny week, or how your habits change, so real results will differ. That is why we call the figures estimates.</p>
         </section>
 
         <div class="discs">

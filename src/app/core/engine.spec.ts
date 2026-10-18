@@ -138,12 +138,12 @@ describe('roof space and connection limit', () => {
     expect(usableArea(home({ roofAreaM2: 8, obstacles: { dormer: 3 } as any }))).toBe(6);
   });
   it('limits a single-phase home to about 6 kW and three-phase to about 11 kW', () => {
-    expect(connectionLimitPanels(home(), A)).toBe(Math.floor((CONNECTION_LIMIT_KW.single * 1000) / A.panelWatts)); // 13
-    expect(connectionLimitPanels(home({ threePhase: true }), A)).toBe(25);
+    expect(connectionLimitPanels(home(), A)).toBe(Math.floor((CONNECTION_LIMIT_KW.single * 1000) / A.panelWatts)); // 12 at 465 W
+    expect(connectionLimitPanels(home({ threePhase: true }), A)).toBe(Math.floor((CONNECTION_LIMIT_KW.three * 1000) / A.panelWatts)); // 23 at 465 W
   });
   it('is limited by the smaller of roof space and connection', () => {
-    expect(maxPanels(home({ roofAreaM2: 100 }), A)).toBe(13);
-    expect(maxPanels(home({ roofAreaM2: 100, threePhase: true }), A)).toBe(25);
+    expect(maxPanels(home({ roofAreaM2: 100 }), A)).toBe(12);
+    expect(maxPanels(home({ roofAreaM2: 100, threePhase: true }), A)).toBe(23);
     expect(maxPanels(home({ roofAreaM2: 20 }), A)).toBe(10);
     expect(maxPanels(home({ roofAreaM2: 5 }), A)).toBe(3); // usable area never drops below 6 m2
     expect(maxPanels(home({ roofAreaM2: 5 }), assump({ panelAreaM2: 4 }))).toBe(2); // and we always test at least 2 panels
@@ -182,7 +182,7 @@ describe('simulate: energy and money add up', () => {
   it('generates kWp x yield x orientation x shading over a year', () => {
     for (const [o, s] of [['S', 'none'], ['SE_SW', 'some'], ['E_W', 'heavy']] as const) {
       const r = simulate(usage(), home({ orientation: o, shading: s }), A, { panels: 10, batteryKwh: 0 });
-      expect(r.generationKwh).toBeCloseTo(4.4 * 920 * orientationFactor(o) * shadingFactor(s), 6);
+      expect(r.generationKwh).toBeCloseTo(10 * A.panelWatts / 1000 * 920 * orientationFactor(o) * shadingFactor(s), 6);
       expect(r.monthlyGen.reduce((a, b) => a + b, 0)).toBeCloseTo(r.generationKwh, 6);
     }
   });
@@ -292,7 +292,7 @@ describe('recommended strategies', () => {
   });
   it('tests the largest allowed system, not only even panel counts', () => {
     const sizes = new Set(grid(4200, home({ roofAreaM2: 100 })).map((r) => r.panels));
-    expect(sizes.has(13)).toBe(true);
+    expect(sizes.has(12)).toBe(true);
     expect(sizes.has(4)).toBe(true);
   });
   it('handles a tiny roof', () => {
@@ -305,8 +305,8 @@ describe('recommended strategies', () => {
     expect(best.paybackYears).toBeLessThan(12);
   });
   it('a heat pump and EV push the suggested system up', () => {
-    const plain = pick(4200, home({ roofAreaM2: 100 }))[1].panels;
-    const loaded = pick(4200, home({ roofAreaM2: 100, addEv: true, addHeatPump: true }))[1].panels;
+    const plain = pick(4200, home({ roofAreaM2: 100, threePhase: true }))[1].panels;
+    const loaded = pick(4200, home({ roofAreaM2: 100, threePhase: true, addEv: true, addHeatPump: true }))[1].panels;
     expect(loaded).toBeGreaterThan(plain);
   });
 });
@@ -1042,5 +1042,32 @@ describe('charging the battery from the grid at the night rate', () => {
     const on = run({ gridCharge: true });
     expect(on.importKwh).toBeGreaterThan(0);
     expect(on.billAfter).toBeGreaterThan(0);
+  });
+});
+
+describe('roof direction in the calculation', () => {
+  it('cuts the output of every panel by the direction factor', () => {
+    const s = simulate(usage(), { ...home(), orientation: 'S' }, A, { panels: 8, batteryKwh: 0 });
+    const ew = simulate(usage(), { ...home(), orientation: 'E_W' }, A, { panels: 8, batteryKwh: 0 });
+    expect(ew.generationKwh / s.generationKwh).toBeCloseTo(0.82, 2);
+  });
+  it('lowers the yearly benefit for the same panels', () => {
+    const s = simulate(usage(), { ...home(), orientation: 'S' }, A, { panels: 8, batteryKwh: 0 });
+    const ew = simulate(usage(), { ...home(), orientation: 'E_W' }, A, { panels: 8, batteryKwh: 0 });
+    expect(ew.annualBenefit).toBeLessThan(s.annualBenefit);
+  });
+});
+
+describe('watts per panel', () => {
+  it('defaults to 465 W', () => expect(A.panelWatts).toBe(465));
+  it('sets the system size, so more watts means fewer panels for the connection limit', () => {
+    expect(connectionLimitPanels(home(), assump({ panelWatts: 400 }))).toBeGreaterThan(connectionLimitPanels(home(), assump({ panelWatts: 550 })));
+  });
+  it('scales output and cost with the rating', () => {
+    const lo = simulate(usage(), home(), assump({ panelWatts: 400 }), { panels: 10, batteryKwh: 0 });
+    const hi = simulate(usage(), home(), assump({ panelWatts: 500 }), { panels: 10, batteryKwh: 0 });
+    expect(hi.kwp).toBeCloseTo(5, 9);
+    expect(hi.generationKwh / lo.generationKwh).toBeCloseTo(500 / 400, 2);
+    expect(hi.grossCost).toBeGreaterThan(lo.grossCost);
   });
 });

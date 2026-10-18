@@ -133,7 +133,7 @@ export interface Assumptions {
   exportRate: number; // EUR/kWh
   tariffInflation: number; // per year
   yieldPerKwp: number; // kWh per kWp per year, south, ~35 degrees
-  panelWatts: number;
+  panelWatts: number; // rated watts per panel, editable; 465 W is a common current panel
   panelAreaM2: number;
   panelCostBase: number; // fixed install cost
   panelCostPerKwp: number;
@@ -163,7 +163,7 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
   exportRate: PRICES.tariffs.export,
   tariffInflation: 0.02,
   yieldPerKwp: PRICES.solar.yieldPerKwp,
-  panelWatts: 440,
+  panelWatts: 465,
   panelAreaM2: 2.0,
   panelCostBase: PRICES.solar.costBase,
   panelCostPerKwp: PRICES.solar.costPerKwp,

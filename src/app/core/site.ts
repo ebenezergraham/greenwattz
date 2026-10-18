@@ -9,7 +9,7 @@ export const SITE = {
    * https://web3forms.com using that address and paste it here. Access keys are meant to be public.
    * While this is empty the form falls back to opening a draft email.
    */
-  formAccessKey: '',
+  formAccessKey: '6cddef7e-ca16-42a6-a7f3-4d465bf1759b',
   formEndpoint: 'https://api.web3forms.com/submit',
   /** Operator details shown in the privacy policy. Replace before launch. */
   operator: '[Your legal name or company], Ireland',

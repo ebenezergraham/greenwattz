@@ -83,7 +83,7 @@ export const GLOSSARY: Term[] = [
     more: 'The average Irish home uses roughly 4,200 kWh a year. A 10 kWh battery can hold about 10 kWh.',
     see: ['kw', 'unit-rate'] },
   { id: 'kwp', term: 'kWp (kilowatt-peak)', group: 'Solar basics',
-    short: 'The rated peak output of a set of solar panels. Twelve 440 W panels make a 5.28 kWp system.',
+    short: 'The rated peak output of a set of solar panels. Twelve 465 W panels make a 5.58 kWp system.',
     more: 'The kWp number is how installers describe system size. In Ireland, a system makes roughly 900 kWh a year for each kWp if it faces south.',
     see: ['kw', 'panel', 'yield'] },
   { id: 'microgeneration', term: 'Microgeneration', group: 'Solar basics',
