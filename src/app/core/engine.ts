@@ -52,11 +52,33 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
   co2KgPerKwh: 0.3,
 };
 
+export type ObstacleKey = 'chimney' | 'skylight' | 'vent' | 'dish' | 'dormer' | 'thermal';
+export type Obstacles = Record<ObstacleKey, number>;
+export const NO_OBSTACLES: Obstacles = { chimney: 0, skylight: 0, vent: 0, dish: 0, dormer: 0, thermal: 0 };
+
+/** Typical area each obstacle takes out of a roof slope, including the clearance panels need around it. */
+export const OBSTACLES: { key: ObstacleKey; label: string; m2: number; max: number }[] = [
+  { key: 'chimney', label: 'Chimney stack', m2: 3, max: 3 },
+  { key: 'skylight', label: 'Skylight or roof window', m2: 2, max: 8 },
+  { key: 'vent', label: 'Vent pipe, flue or extractor', m2: 0.7, max: 8 },
+  { key: 'dish', label: 'Satellite dish or aerial', m2: 0.5, max: 3 },
+  { key: 'dormer', label: 'Dormer window', m2: 5, max: 3 },
+  { key: 'thermal', label: 'Existing solar water heating panel', m2: 4.5, max: 2 },
+];
+
+export function obstacleArea(h: HomeInputs): number {
+  return OBSTACLES.reduce((t, o) => t + o.m2 * (h.obstacles[o.key] ?? 0), 0);
+}
+export function usableArea(h: HomeInputs): number {
+  return Math.max(6, h.roofAreaM2 - obstacleArea(h));
+}
+
 export interface HomeInputs {
   occupancy: Occupancy;
   orientation: Orientation;
   shading: Shading;
-  roofAreaM2: number; // usable south-ish roof area
+  roofAreaM2: number; // roof area on the chosen side, before taking off obstacles
+  obstacles: Obstacles;
   addEv: boolean;
   addHeatPump: boolean;
 }
@@ -197,7 +219,7 @@ export function systemCost(kwp: number, battery: number, a: Assumptions): number
 }
 
 export function maxPanels(home: HomeInputs, a: Assumptions): number {
-  return Math.max(2, Math.min(30, Math.floor(home.roofAreaM2 / a.panelAreaM2)));
+  return Math.max(2, Math.min(30, Math.floor(usableArea(home) / a.panelAreaM2)));
 }
 
 /** Simulate a typical day per month at hourly steps. */

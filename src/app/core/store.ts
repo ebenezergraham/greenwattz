@@ -1,16 +1,16 @@
 import { Injectable, computed, signal } from '@angular/core';
 import {
-  Assumptions, Config, DEFAULT_ASSUMPTIONS, HomeInputs, Usage, annualFromBill, buildGrid, cashflow,
+  Assumptions, Config, DEFAULT_ASSUMPTIONS, HomeInputs, NO_OBSTACLES, ObstacleKey, usableArea, obstacleArea, Usage, annualFromBill, buildGrid, cashflow,
   estimateProfile, maxPanels, pickStrategies, simulate, withExtras,
 } from './engine';
 
 export type UsageMode = 'meter' | 'annual' | 'bill';
 
-/** Journey state lives in memory only. Nothing is stored or sent anywhere. */
+/** Journey state lives in memory only. Nothing here is stored or sent to us. */
 @Injectable({ providedIn: 'root' })
 export class PlanStore {
   readonly home = signal<HomeInputs>({
-    occupancy: 'mixed', orientation: 'S', shading: 'none', roofAreaM2: 30, addEv: false, addHeatPump: false,
+    occupancy: 'mixed', orientation: 'S', shading: 'none', roofAreaM2: 30, obstacles: { ...NO_OBSTACLES }, addEv: false, addHeatPump: false,
   });
   readonly assumptions = signal<Assumptions>({ ...DEFAULT_ASSUMPTIONS });
   readonly mode = signal<UsageMode>('annual');
@@ -41,6 +41,9 @@ export class PlanStore {
   );
   readonly flow = computed(() => cashflow(this.result(), this.assumptions()));
 
+  readonly usableArea = computed(() => usableArea(this.home()));
+  readonly obstacleArea = computed(() => obstacleArea(this.home()));
+  setObstacle(k: ObstacleKey, n: number) { this.patchHome({ obstacles: { ...this.home().obstacles, [k]: Math.max(0, n) } }); }
   patchHome(p: Partial<HomeInputs>) { this.home.update((h) => ({ ...h, ...p })); this.chosen.set(null); }
   patchAssumptions(p: Partial<Assumptions>) { this.assumptions.update((a) => ({ ...a, ...p })); }
   pick(c: Config) { this.chosen.set(c); }

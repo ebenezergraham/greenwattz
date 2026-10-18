@@ -2,6 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
 import { PlanStore } from '../core/store';
+import { OBSTACLES } from '../core/engine';
 import { INTRODUCTION_INSTALLERS, SITE } from '../core/site';
 import { Installer, PRIORITIES, Priority, rank, siteUrl, mapsUrl, seaiMatch } from '../core/installers';
 
@@ -109,7 +110,7 @@ const LEVELS = [
                 @for (i of chosen(); track i.slug) { <li><a [href]="siteOf(i)" target="_blank" rel="noopener noreferrer">{{ i.name }} website</a></li> }
               </ul>
             } @else { <p class="small muted top">Tick installers to build your list.</p> }
-            <p class="small muted top"><i class="ph ph-lock-key"></i> We do not send your details to installers. You contact them yourself, so nothing leaves your device.</p>
+            <p class="small muted top"><i class="ph ph-lock-key"></i> We do not send your details to installers. You contact them yourself, so your plan is not sent to them by us.</p>
           </div>
         </aside>
       </div>
@@ -187,6 +188,12 @@ export class QuotePage {
   siteOf(i: Installer) { return siteUrl(i); }
   round50(n: number) { return Math.round(n / 50) * 50; }
 
+  private obstacleText(): string {
+    const o = this.store.home().obstacles;
+    const parts = OBSTACLES.filter((x) => o[x.key] > 0).map((x) => `${o[x.key]} x ${x.label.toLowerCase()}`);
+    return parts.length ? ` (on the roof: ${parts.join(', ')})` : '';
+  }
+
   private summary(): string {
     const r = this.r(), h = this.store.home(), u = this.store.usage();
     const ori = { S: 'south', SE_SW: 'south-east or south-west', E_W: 'east or west', N: 'north' }[h.orientation];
@@ -195,7 +202,7 @@ export class QuotePage {
       'Solar quote request (planned with GreenWattz)',
       `Yearly electricity use: about ${Math.round(u.annualKwh)} kWh`,
       `Suggested system: ${r.panels} panels (${r.kwp.toFixed(1)} kWp)${r.batteryKwh ? ' with a ' + r.batteryKwh + ' kWh battery' : ', no battery'}`,
-      `Roof: faces ${ori}, shade ${h.shading}, about ${h.roofAreaM2} m2 usable`,
+      `Roof: faces ${ori}, shade ${h.shading}, about ${Math.round(this.store.usableArea())} m2 usable after obstacles${this.obstacleText()}`,
       `Planning to add: ${[h.addEv && 'EV', h.addHeatPump && 'heat pump'].filter(Boolean).join(' and ') || 'nothing yet'}`,
       `Most important to me: ${top.length ? top.join(', ') : 'a balanced quote'}`,
       'Please itemise the quote, list panel, inverter and battery brands, and give warranty lengths in writing.',

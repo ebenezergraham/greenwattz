@@ -14,7 +14,7 @@
       <!-- STEP 1 -->
       @if (step() === 0) {
         <h1>Tell us about your home</h1>
-        <p class="muted lead">Four quick questions. Nothing here is saved or sent anywhere.</p>
+        <p class="muted lead">Four quick questions. Your answers stay in your browser and are not sent to us.</p>
 
         <div class="stack">
           <div class="field">
@@ -46,9 +46,44 @@
           </div>
 
           <div class="field">
-            <label for="roof">Usable roof area: <b class="num">{{ s.home().roofAreaM2 }} m²</b></label>
+            <label for="roof">Roof area on that side: <b class="num">{{ s.home().roofAreaM2 }} m²</b></label>
             <input id="roof" type="range" min="8" max="70" step="1" [value]="s.home().roofAreaM2" (input)="setRoof($event)" />
-            <span class="hint">Room for about {{ s.maxPanels() }} panels. A typical semi-detached roof has 20 to 35 m² facing one way.</span>
+            <span class="hint">A typical semi-detached roof has 20 to 35 m² facing one way. Use the whole slope; you can mark what is on it below.</span>
+            <details class="adv">
+              <summary>Advanced: measure my roof</summary>
+              <div class="measure">
+                <ol>
+                  <li><a href="https://www.google.com/maps/@?api=1&map_action=map&basemap=satellite&center=53.4,-8&zoom=7" target="_blank" rel="noopener noreferrer">Open Google Maps in satellite view</a> and search for your address.</li>
+                  <li>Zoom right in. Right-click one corner of the roof slope you would put panels on and choose "Measure distance".</li>
+                  <li>Click each corner in turn and close the shape by clicking the first point. Google shows the total area.</li>
+                  <li>That is the footprint seen from above. A sloping roof is bigger, so divide by about 0.85, then enter the result below. Include the whole slope and mark chimneys, skylights and so on in the next question.</li>
+                </ol>
+                <p class="small muted">Opening Google Maps sends nothing from GreenWattz. It is a separate site with its own privacy policy.</p>
+              </div>
+              <div class="field">
+                <label for="roofExact">Roof area on that side (m²)</label>
+                <input id="roofExact" type="number" min="5" max="150" step="0.5" [value]="s.home().roofAreaM2" (change)="setRoofExact($event)" />
+                <span class="hint">Already know it from a survey or quote? Enter it here.</span>
+              </div>
+            </details>
+          </div>
+
+          <div class="field">
+            <span class="lbl" id="obs">What is on that roof slope?</span>
+            <span class="hint">Panels need clear space around these. Add how many you have and we will take the room off for you.</span>
+            <ul class="obs" aria-labelledby="obs">
+              @for (o of obstacles; track o.key) {
+                <li>
+                  <div class="name"><span>{{ o.label }}</span><span class="small muted">takes out about {{ o.m2 }} m² each</span></div>
+                  <div class="step" role="group" [attr.aria-label]="o.label + ' count'">
+                    <button type="button" class="btn sm" (click)="bump(o.key, -1, o.max)" [disabled]="count(o.key) === 0" [attr.aria-label]="'Fewer ' + o.label">-</button>
+                    <output class="num" aria-live="polite">{{ count(o.key) }}</output>
+                    <button type="button" class="btn sm" (click)="bump(o.key, 1, o.max)" [disabled]="count(o.key) >= o.max" [attr.aria-label]="'More ' + o.label">+</button>
+                  </div>
+                </li>
+              }
+            </ul>
+            <p class="roomline"><b class="num">{{ s.usableArea() | number: '1.0-0' }} m²</b> usable{{ s.obstacleArea() ? ' after taking off ' + (s.obstacleArea() | number: '1.0-1') + ' m²' : '' }}. Room for about <b class="num">{{ s.maxPanels() }}</b> panels.</p>
           </div>
 
           <div class="field">
@@ -240,7 +275,7 @@
           <div><dt>You pay</dt><dd class="num">{{ eur0(r().netCost) }}</dd></div>
           <div><dt>Payback</dt><dd class="num">{{ payback(r().paybackYears) }}</dd></div>
         </dl>
-        <p class="small muted top"><i class="ph ph-lock-key"></i> Calculated in your browser. Nothing is sent or stored.</p>
+        <p class="small muted top"><i class="ph ph-lock-key"></i> Calculated in your browser. Your answers are not sent to us or stored.</p>
       </div>
     </aside>
   </div>

@@ -2,7 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
 import { PlanStore } from '../core/store';
-import { Assumptions, BATTERY_OPTIONS, Orientation, Occupancy, Shading, Scenario, averageDay, simulate, solarDay, splitUsage } from '../core/engine';
+import { Assumptions, BATTERY_OPTIONS, OBSTACLES, ObstacleKey, Orientation, Occupancy, Shading, Scenario, averageDay, simulate, solarDay, splitUsage } from '../core/engine';
 import { HdfError, parseHdf } from '../core/hdf';
 import { CashChart, DayChart, MonthChart } from '../ui/charts';
 
@@ -22,6 +22,9 @@ export class PlanPage {
   readonly fileName = signal('');
   readonly showAssump = signal(false);
   readonly batteryOptions = BATTERY_OPTIONS;
+  readonly obstacles = OBSTACLES;
+  count(k: ObstacleKey) { return this.s.home().obstacles[k] ?? 0; }
+  bump(k: ObstacleKey, d: number, max: number) { this.s.setObstacle(k, Math.min(max, this.count(k) + d)); }
 
   readonly split = computed(() => splitUsage(this.s.usage().profile));
   readonly dayAvg = computed(() => averageDay(this.s.usage().profile));
@@ -78,6 +81,7 @@ export class PlanPage {
   setAnnual(e: Event) { this.s.annualKwh.set(Math.max(500, this.num(e) || 0)); this.s.chosen.set(null); }
   setBill(e: Event) { this.s.monthlyBill.set(Math.max(40, this.num(e) || 0)); this.s.chosen.set(null); }
   setRoof(e: Event) { this.s.patchHome({ roofAreaM2: this.num(e) }); }
+  setRoofExact(e: Event) { const v = this.num(e); if (v >= 5) this.s.patchHome({ roofAreaM2: Math.min(150, v) }); }
 
   pickStrategy(x: Scenario) { this.s.pick({ panels: x.panels, batteryKwh: x.batteryKwh }); }
   isPicked(x: Scenario) { return x.panels === this.cfg().panels && x.batteryKwh === this.cfg().batteryKwh; }

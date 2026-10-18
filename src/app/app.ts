@@ -29,7 +29,7 @@ const KEY = 'greenwattz.consent.v1';
       <div class="wrap foot">
         <div>
           <b>GreenWattz</b>
-          <p class="muted small">Independent solar planning for Irish homes. Everything is calculated in your browser. Your data never leaves your device.</p>
+          <p class="muted small">Independent solar planning for Irish homes. Everything is calculated in your browser, and your answers are not sent to us.</p>
         </div>
         <div class="links">
           <a routerLink="/privacy">Privacy policy</a>

@@ -45,3 +45,13 @@
 .assump { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 22px; .check { grid-column: 1 / -1; } }
 @media (max-width: 640px) { .assump { grid-template-columns: 1fr; } }
 .nav-btns { display: flex; justify-content: space-between; margin: 48px 0 0; }
+
+.adv { margin-top: 6px; summary { cursor: pointer; font-weight: 600; color: var(--accent); } .field { margin-top: 14px; max-width: 280px; } }
+
+.measure { margin-top: 14px; ol { padding-left: 20px; margin: 0 0 10px; display: grid; gap: 8px; } max-width: 62ch; }
+
+.obs { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 8px; }
+.obs li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--r-ctl); background: var(--surface); }
+.obs .name { display: grid; gap: 0; font-weight: 600; .small { font-weight: 400; } }
+.obs .step { display: flex; align-items: center; gap: 12px; output { min-width: 1.5ch; text-align: center; font-weight: 650; font-size: 1.1rem; } .btn { min-width: 40px; padding: 0; } }
+.roomline { margin-top: 6px; padding: 12px 14px; border-radius: var(--r-ctl); background: var(--accent-soft); }
