@@ -186,3 +186,21 @@ input.short { max-width: 200px; }
   .cmp.tpls .tpl-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; .nm, .sy { grid-column: 1 / -1; } .r { text-align: left; } .r::before { content: attr(data-l); display: block; font-size: 0.75rem; color: var(--ink-3); } }
 }
 .tpl-row[aria-checked='true'] .radio { border-color: var(--ink); background: var(--ink); box-shadow: inset 0 0 0 3px var(--surface); }
+
+.win { margin: 12px 0 0; max-width: 640px; }
+.win .bars { display: grid; grid-template-columns: repeat(24, 1fr); align-items: end; gap: 2px; height: 72px; }
+.win .bar { background: var(--line); border-radius: 2px 2px 0 0; min-height: 2px; }
+.win .bar.on { background: var(--sun-strong); }
+.win .track { position: relative; height: 28px; margin-top: 4px; }
+.win .rail { position: absolute; left: 0; right: 0; top: 12px; height: 4px; border-radius: 2px; background: var(--line); }
+.win .fill { position: absolute; top: 12px; height: 4px; border-radius: 2px; background: var(--ink); }
+.win input[type=range] { position: absolute; left: 0; width: 100%; top: 0; height: 28px; margin: 0; background: none; pointer-events: none; -webkit-appearance: none; appearance: none; }
+.win input[type=range]::-webkit-slider-thumb { pointer-events: auto; -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: var(--sun); border: 2px solid var(--ink); cursor: grab; }
+.win input[type=range]::-moz-range-thumb { pointer-events: auto; width: 18px; height: 18px; border-radius: 50%; background: var(--sun); border: 2px solid var(--ink); cursor: grab; }
+.win input[type=range]::-webkit-slider-runnable-track { background: none; }
+.win input[type=range]::-moz-range-track { background: none; }
+.win input[type=range]:focus-visible { outline: none; }
+.win input[type=range]:focus-visible::-webkit-slider-thumb { outline: 3px solid var(--focus); outline-offset: 2px; }
+.win .ticks { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--ink-3); }
+.range-read { margin: 8px 0; font-size: 1.05rem; }
+.win-rows { max-width: 420px; }

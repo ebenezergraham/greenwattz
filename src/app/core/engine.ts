@@ -889,6 +889,10 @@ export const ZONES: { key: ZoneKey; label: string; when: string; hours: number[]
 export interface ZoneNeed { key: ZoneKey; label: string; when: string; average: number; winter: number; summer: number }
 export interface BatteryZones {
   zones: ZoneNeed[];
+  /** What a battery would have to supply in each hour of the day (kWh), averaged over the year, and for December and June. */
+  hourly: { average: number[]; winter: number[]; summer: number[]; median?: number[] };
+  /** Hour by hour, the household's median use and the solar the panels make on an average day. Only when a meter file gave a median day. */
+  medianDay?: { use: number[]; solar: number[] };
   /** Solar left after the house has used what it needs, per day, that could charge a battery. */
   surplusAverage: number;
   surplusWinter: number;
@@ -908,7 +912,17 @@ export function batteryZones(usage: Usage, home: HomeInputs, a: Assumptions, pan
     winter: need(11, z.hours), summer: need(5, z.hours),
   }));
   const surplus = (m: number) => gen[m].reduce((s, g, h) => s + Math.max(0, g - usage.profile[m][h]), 0);
-  return { zones, surplusAverage: MONTH_DAYS.reduce((s, d, m) => s + surplus(m) * d, 0) / total, surplusWinter: surplus(11) };
+  const hourNeed = (m: number, h: number) => Math.max(0, usage.profile[m][h] - gen[m][h]);
+  const hourly: BatteryZones["hourly"] = {
+    average: Array.from({ length: 24 }, (_, h) => MONTH_DAYS.reduce((s, d, m) => s + hourNeed(m, h) * d, 0) / total),
+    winter: Array.from({ length: 24 }, (_, h) => hourNeed(11, h)),
+    summer: Array.from({ length: 24 }, (_, h) => hourNeed(5, h)),
+  };
+  // A meter file gives the household's median day, which is a better picture of a normal night than the mean.
+  const solarAvg = Array.from({ length: 24 }, (_, h) => MONTH_DAYS.reduce((s, d, m) => s + gen[m][h] * d, 0) / total);
+  const median = usage.median;
+  if (median) hourly.median = median.map((v, h) => Math.max(0, v - solarAvg[h]));
+  return { zones, hourly, medianDay: median ? { use: median, solar: solarAvg } : undefined, surplusAverage: MONTH_DAYS.reduce((s, d, m) => s + surplus(m) * d, 0) / total, surplusWinter: surplus(11) };
 }
 
 export interface ZoneSize {
@@ -924,20 +938,59 @@ export interface ZoneSize {
   chargedWinter: number;
 }
 
+/**
+ * The hours from `start` up to but not including `end`, on a 24 hour clock. When `end` is earlier than `start` the window
+ * runs through midnight, so 17 to 8 is 5pm to 8am. Equal values give an empty window.
+ */
+export function hoursInWindow(start: number, end: number): number[] {
+  const s = ((Math.round(start) % 25) + 25) % 25, e2 = ((Math.round(end) % 25) + 25) % 25;
+  const out: number[] = [];
+  if (s === e2) return out;
+  if (s < e2) { for (let h = s; h < e2; h++) out.push(h % 24); return out; }
+  for (let h = s; h < 24; h++) out.push(h);
+  for (let h = 0; h < e2; h++) out.push(h);
+  return out;
+}
+
+function sizeFor(z: BatteryZones, average: number, winter: number): ZoneSize {
+  const nominalKwh = average / 0.9; // 10% is kept in reserve
+  const fit = BATTERY_SIZES.find((s) => s >= nominalKwh);
+  return {
+    needKwh: average, nominalKwh,
+    size: average <= 0 ? 0 : fit ?? BATTERY_SIZES[BATTERY_SIZES.length - 1],
+    tooBig: average > 0 && fit === undefined,
+    chargedAverage: average > 0 ? Math.min(1, (z.surplusAverage * 0.9) / average) : 1,
+    chargedWinter: winter > 0 ? Math.min(1, (z.surplusWinter * 0.9) / winter) : 1,
+  };
+}
+
 /** Recommends a battery size for the times of day the household wants covered. */
 export function sizeForZones(z: BatteryZones, selected: ZoneKey[]): ZoneSize {
   const chosen = z.zones.filter((x) => selected.includes(x.key));
-  const needKwh = chosen.reduce((s, x) => s + x.average, 0);
-  const nominalKwh = needKwh / 0.9; // 10% is kept in reserve
-  const fit = BATTERY_SIZES.find((s) => s >= nominalKwh);
-  const winterNeed = chosen.reduce((s, x) => s + x.winter, 0);
-  return {
-    needKwh, nominalKwh,
-    size: needKwh <= 0 ? 0 : fit ?? BATTERY_SIZES[BATTERY_SIZES.length - 1],
-    tooBig: needKwh > 0 && fit === undefined,
-    chargedAverage: needKwh > 0 ? Math.min(1, (z.surplusAverage * 0.9) / needKwh) : 1,
-    chargedWinter: winterNeed > 0 ? Math.min(1, (z.surplusWinter * 0.9) / winterNeed) : 1,
-  };
+  return sizeFor(z, chosen.reduce((s, x) => s + x.average, 0), chosen.reduce((s, x) => s + x.winter, 0));
+}
+
+/**
+ * The need, and a recommended battery size, for a window of hours. With a meter file the size follows the household's
+ * median day; otherwise it follows the yearly average. Both are returned so they can be compared.
+ */
+export interface WindowSize extends ZoneSize {
+  winter: number; summer: number;
+  /** Use the size was based on. */
+  basis: 'median' | 'average';
+  /** Need after solar on an average day over the year. */
+  average: number;
+  /** Need after solar on the household's median day, and the raw use and solar behind it. Only with a meter file. */
+  median?: { need: number; use: number; solar: number };
+}
+
+export function sizeForWindow(z: BatteryZones, hours: number[]): WindowSize {
+  const sum = (a: number[]) => hours.reduce((s, h) => s + a[h], 0);
+  const winter = sum(z.hourly.winter);
+  const average = sum(z.hourly.average);
+  const median = z.hourly.median && z.medianDay ? { need: sum(z.hourly.median), use: sum(z.medianDay.use), solar: sum(z.medianDay.solar) } : undefined;
+  const need = median ? median.need : average;
+  return { ...sizeFor(z, need, winter), winter, summer: sum(z.hourly.summer), basis: median ? 'median' : 'average', average, median };
 }
 
 export interface StrategyTemplate {

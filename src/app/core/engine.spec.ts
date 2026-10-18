@@ -3,7 +3,7 @@ import {
   PRICES, priceAgeDays, pricesAreStale,
   Eligibility, grantEligibility,
   Assumptions, BATTERY_OPTIONS, BATTERY_PRODUCTS, BATTERY_SIZES, BATTERY_TIERS, BatteryTier, batteryPrice, batteryTierInfo, BandMonthly, bandHours, medianFromBands, profileFromBands, Band, Tariff, bandBreakdown, bandOf, bandsOfDay, blendedRate, dayStats, rateFor, BEST_MAX_GEN_RATIO, CONNECTION_LIMIT_KW, HOUSE_TYPES, ROOF_TYPES, STOREY_ACCESS, roofTypeInfo, DEFAULT_ASSUMPTIONS as A, HomeInputs, MONTH_DAYS, NO_OBSTACLES, Usage,
-  annualFromBill, annualFromProfile, averageDay, buildGrid, cashflow, templateResult, STRATEGY_TEMPLATES, batteryZones, sizeForZones, ZONES, DEFAULT_GOALS, Goals, mixWarnings, EXPORT_PRESETS, ratePreset, RATE_PRESETS, inverterLimitKw, loanPayment, paybackRange, exportTaxFor, EXPORT_TAX_RATES, LIFETIME, paybackFrom, project, connectionLimitPanels, costBreakdown, estimateProfile,
+  annualFromBill, annualFromProfile, averageDay, buildGrid, cashflow, hoursInWindow, sizeForWindow, templateResult, STRATEGY_TEMPLATES, batteryZones, sizeForZones, ZONES, DEFAULT_GOALS, Goals, mixWarnings, EXPORT_PRESETS, ratePreset, RATE_PRESETS, inverterLimitKw, loanPayment, paybackRange, exportTaxFor, EXPORT_TAX_RATES, LIFETIME, paybackFrom, project, connectionLimitPanels, costBreakdown, estimateProfile,
   maxPanels, obstacleArea, orientationFactor, pickStrategies, roofFitPanels, seaiGrantFor, shadingFactor, simulate, solarDay,
   splitUsage, systemCost, usableArea, withExtras,
 } from './engine';
@@ -1346,5 +1346,82 @@ describe('strategy templates', () => {
     const grid = buildGrid(usage(), big(), A);
     expect(pickStrategies(grid, false, { cover: 0.5, exportIncome: 0, battery: 'none' })[1].batteryKwh).toBe(0);
     expect(pickStrategies(grid, false, { cover: 0.5, exportIncome: 0, battery: 'required' })[1].batteryKwh).toBeGreaterThan(0);
+  });
+});
+
+describe('a window of hours for the battery', () => {
+  const z = batteryZones(usage(), home(), A, 12);
+  it('lists the hours of a daytime window', () => expect(hoursInWindow(8, 17)).toEqual([8, 9, 10, 11, 12, 13, 14, 15, 16]));
+  it('runs through midnight when the end is before the start', () => {
+    expect(hoursInWindow(17, 8)).toEqual([17, 18, 19, 20, 21, 22, 23, 0, 1, 2, 3, 4, 5, 6, 7]);
+    expect(hoursInWindow(23, 8)).toEqual([23, 0, 1, 2, 3, 4, 5, 6, 7]);
+  });
+  it('is empty when the start and end are the same, and 24 hours for 0 to 24', () => {
+    expect(hoursInWindow(9, 9)).toEqual([]);
+    expect(hoursInWindow(0, 24)).toHaveLength(24);
+  });
+  it('matches the night zone when the window is 11pm to 8am', () => {
+    const w = sizeForWindow(z, hoursInWindow(23, 8));
+    expect(w.needKwh).toBeCloseTo(z.zones.find((x) => x.key === 'night')!.average, 9);
+  });
+  it('matches the peak zone for 5pm to 7pm and the sum for night plus peak', () => {
+    expect(sizeForWindow(z, hoursInWindow(17, 19)).needKwh).toBeCloseTo(z.zones.find((x) => x.key === 'peak')!.average, 9);
+    const both = z.zones.filter((x) => x.key !== 'day').reduce((s, x) => s + x.average, 0);
+    expect(sizeForWindow(z, [...hoursInWindow(23, 8), ...hoursInWindow(17, 19)]).needKwh).toBeCloseTo(both, 9);
+  });
+  it('needs more battery for a longer window and nothing for an empty one', () => {
+    expect(sizeForWindow(z, hoursInWindow(17, 8)).needKwh).toBeGreaterThan(sizeForWindow(z, hoursInWindow(23, 8)).needKwh);
+    const none = sizeForWindow(z, []);
+    expect(none.size).toBe(0);
+    expect(none.needKwh).toBe(0);
+  });
+  it('gives December and June figures and a standard size', () => {
+    const w = sizeForWindow(z, hoursInWindow(17, 8));
+    expect(w.winter).toBeGreaterThan(w.summer);
+    expect(BATTERY_SIZES).toContain(w.size);
+  });
+  it('hourly need adds up to the zone totals', () => {
+    const all = z.hourly.average.reduce((a, b) => a + b, 0);
+    expect(all).toBeCloseTo(z.zones.reduce((s, x) => s + x.average, 0), 9);
+  });
+});
+
+describe('battery window against the meter median day', () => {
+  const flat = (v: number) => new Array(24).fill(v);
+  const withMedian = (median: number[]): Usage => ({ ...usage(), source: 'smart-meter', median });
+  const win = hoursInWindow(17, 8);
+  it('uses the yearly average when there is no meter median', () => {
+    const w = sizeForWindow(batteryZones(usage(), home(), A, 12), win);
+    expect(w.basis).toBe('average');
+    expect(w.median).toBeUndefined();
+    expect(w.needKwh).toBeCloseTo(w.average, 9);
+  });
+  it('sizes on the median day when a meter file gives one', () => {
+    const w = sizeForWindow(batteryZones(withMedian(flat(0.2)), home(), A, 12), win);
+    expect(w.basis).toBe('median');
+    expect(w.median).toBeDefined();
+    expect(w.needKwh).toBeCloseTo(w.median!.need, 9);
+  });
+  it('recommends a smaller battery when the median night is lighter than the average', () => {
+    const base = sizeForWindow(batteryZones(usage(), home(), A, 12), win);
+    const light = sizeForWindow(batteryZones(withMedian(flat(0.1)), home(), A, 12), win);
+    expect(light.needKwh).toBeLessThan(base.needKwh);
+    expect(light.size).toBeLessThanOrEqual(base.size);
+  });
+  it('recommends a larger battery when the median night is heavier', () => {
+    const base = sizeForWindow(batteryZones(usage(), home(), A, 12), win);
+    const heavy = sizeForWindow(batteryZones(withMedian(flat(0.9)), home(), A, 12), win);
+    expect(heavy.needKwh).toBeGreaterThan(base.needKwh);
+  });
+  it('reports the raw median use, the solar and the need after solar for the window', () => {
+    const w = sizeForWindow(batteryZones(withMedian(flat(0.5)), home(), A, 12), win);
+    expect(w.median!.use).toBeCloseTo(0.5 * win.length, 9);
+    expect(w.median!.solar).toBeGreaterThanOrEqual(0);
+    expect(w.median!.need).toBeLessThanOrEqual(w.median!.use + 1e-9);
+    expect(w.median!.need).toBeGreaterThanOrEqual(w.median!.use - w.median!.solar - 1e-9);
+  });
+  it('still gives the average alongside for comparison', () => {
+    const w = sizeForWindow(batteryZones(withMedian(flat(0.2)), home(), A, 12), win);
+    expect(w.average).toBeGreaterThan(0);
   });
 });

@@ -4,7 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
 import { PlanStore } from '../core/store';
-import { Assumptions, BatteryMode, STRATEGY_TEMPLATES, StrategyTemplate, templateResult, ZoneKey, batteryZones, sizeForZones, Lean, mixWarnings, EXPORT_PRESETS, RATE_PRESETS, RatePresetKey, ratePreset, inverterLimitKw, siteOrientationFactor, shadingFactor, roofTypeInfo, BATTERY_PRODUCTS, BATTERY_SIZES, loanPayment, paybackRange, EXPORT_TAX_RATES, exportTaxFor, PRICES, grantEligibility, seaiGrantFor, BATTERY_GUIDE, BATTERY_OPTIONS, BATTERY_TIERS, BatteryTier, batteryPrice, HOUSE_TYPES, HouseType, OBSTACLES, ObstacleKey, ROOF_TYPES, RoofType, Storeys, Orientation, Occupancy, Shading, Scenario, Tariff, bandsOfDay, simulate, solarDay } from '../core/engine';
+import { Assumptions, BatteryMode, STRATEGY_TEMPLATES, StrategyTemplate, templateResult, batteryZones, hoursInWindow, sizeForWindow, Lean, mixWarnings, EXPORT_PRESETS, RATE_PRESETS, RatePresetKey, ratePreset, inverterLimitKw, siteOrientationFactor, shadingFactor, roofTypeInfo, BATTERY_PRODUCTS, BATTERY_SIZES, loanPayment, paybackRange, EXPORT_TAX_RATES, exportTaxFor, PRICES, grantEligibility, seaiGrantFor, BATTERY_GUIDE, BATTERY_OPTIONS, BATTERY_TIERS, BatteryTier, batteryPrice, HOUSE_TYPES, HouseType, OBSTACLES, ObstacleKey, ROOF_TYPES, RoofType, Storeys, Orientation, Occupancy, Shading, Scenario, Tariff, bandsOfDay, simulate, solarDay } from '../core/engine';
 import { HdfError, parseHdf } from '../core/hdf';
 import { inferHousehold } from '../core/infer';
 import { CashChart, DayChart, Legend, MonthChart } from '../ui/charts';
@@ -68,11 +68,34 @@ export class PlanPage {
   }
   readonly batteryModes: { key: BatteryMode; label: string }[] = [{ key: 'any', label: 'Either' }, { key: 'none', label: 'No battery' }, { key: 'required', label: 'With a battery' }];
   setBatteryMode(m: BatteryMode) { this.s.chosen.set(null); this.s.goals.update((g) => ({ ...g, battery: m })); }
-  /** Times of day the user wants the battery to cover. */
-  readonly zoneSel = signal<ZoneKey[]>(['night', 'peak']);
+  /** The window of the day the user wants the battery to cover, as start and end hours on a 24 hour clock. */
+  readonly winStart = signal(17);
+  readonly winEnd = signal(8);
   readonly zoneInfo = computed(() => batteryZones(this.s.usage(), this.s.home(), this.s.assumptions(), this.r().panels));
-  readonly zoneSize = computed(() => sizeForZones(this.zoneInfo(), this.zoneSel()));
-  toggleZone(k: ZoneKey) { this.zoneSel.update((s) => (s.includes(k) ? s.filter((x) => x !== k) : [...s, k])); }
+  readonly winHours = computed(() => hoursInWindow(this.winStart(), this.winEnd()));
+  readonly zoneSize = computed(() => sizeForWindow(this.zoneInfo(), this.winHours()));
+  /** Bars for the chart: the hourly need as a share of the tallest hour, and whether each hour is in the window. */
+  readonly winBars = computed(() => {
+    const z = this.zoneInfo().hourly, avg = z.median ?? z.average, max = Math.max(...avg, 0.001), inn = new Set(this.winHours());
+    return avg.map((v, h) => ({ h, pct: (v / max) * 100, on: inn.has(h), kwh: v }));
+  });
+  /** Where the shaded window sits on the slider track, as percentages. One piece, or two when it runs through midnight. */
+  readonly winSpans = computed(() => {
+    const s = this.winStart(), e = this.winEnd();
+    if (s === e) return [];
+    return s < e ? [{ left: (s / 24) * 100, width: ((e - s) / 24) * 100 }] : [{ left: (s / 24) * 100, width: ((24 - s) / 24) * 100 }, { left: 0, width: (e / 24) * 100 }];
+  });
+  setWinStart(e: Event) { this.winStart.set(Math.max(0, Math.min(24, this.num(e)))); }
+  setWinEnd(e: Event) { this.winEnd.set(Math.max(0, Math.min(24, this.num(e)))); }
+  setWindow(start: number, end: number) { this.winStart.set(start); this.winEnd.set(end); }
+  readonly windowPresets = [
+    { label: 'Evening and night', start: 17, end: 8 },
+    { label: 'Night', start: 23, end: 8 },
+    { label: 'Peak', start: 17, end: 19 },
+    { label: 'Daytime', start: 8, end: 17 },
+  ];
+  windowOn(start: number, end: number) { return this.winStart() === start && this.winEnd() === end; }
+  clock(h: number): string { h = ((h % 24) + 24) % 24; return h === 0 ? '12am' : h < 12 ? h + 'am' : h === 12 ? '12pm' : h - 12 + 'pm'; }
   useZoneSize() { const z = this.zoneSize(); if (z.size > 0) this.setBattery(z.size); }
   readonly bandNames: Record<string, string> = { flat: 'All day', night: 'Night (11pm to 8am)', day: 'Day', peak: 'Peak (5pm to 7pm)' };
   /** Yearly electricity by source, as shares of what the home uses. */

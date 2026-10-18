@@ -516,29 +516,53 @@
           @for (n of mixNotes(); track n.kind) { <p class="hint warn" role="status">{{ n.text }}</p> }
 
           <h3 class="wh">Size it to the times you want covered</h3>
-          <p class="hint">Pick the parts of the day you would like the battery to power. We work out what you use then, after your panels have covered what they can.</p>
-          <div class="seg zones" role="group" aria-label="Times of day to cover">
-            @for (z of zoneInfo().zones; track z.key) { <button type="button" [attr.aria-pressed]="zoneSel().includes(z.key)" (click)="toggleZone(z.key)">{{ z.label }} <span class="muted small">{{ z.when }}</span></button> }
+          <p class="hint">Drag the two handles to the hours you want the battery to power. The bars show what you use in each hour after your panels have covered what they can{{ s.usage().median ? ', from your meter\'s median day' : '' }}. A window can run through midnight, like 5pm to 8am.</p>
+          <div class="win">
+            <div class="bars" aria-hidden="true">
+              @for (b of winBars(); track b.h) { <span class="bar" [class.on]="b.on" [style.height.%]="b.pct"></span> }
+            </div>
+            <div class="track">
+              <div class="rail"></div>
+              @for (s of winSpans(); track $index) { <div class="fill" [style.left.%]="s.left" [style.width.%]="s.width"></div> }
+              <input type="range" min="0" max="24" step="1" [value]="winStart()" (input)="setWinStart($event)" aria-label="Start of the time to cover" [attr.aria-valuetext]="clock(winStart())" />
+              <input type="range" min="0" max="24" step="1" [value]="winEnd()" (input)="setWinEnd($event)" aria-label="End of the time to cover" [attr.aria-valuetext]="clock(winEnd())" />
+            </div>
+            <div class="ticks" aria-hidden="true"><span>12am</span><span>6am</span><span>12pm</span><span>6pm</span><span>12am</span></div>
           </div>
-          <div class="cmp zn">
-            <div class="cmp-head" aria-hidden="true"><span>Time of day</span><span class="r">Average day</span><span class="r">December</span><span class="r">June</span></div>
-            @for (z of zoneInfo().zones; track z.key) {
-              <div class="cmp-row" [class.cur]="zoneSel().includes(z.key)">
-                <span class="nm"><b>{{ z.label }}</b><span class="small muted">{{ z.when }}</span></span>
-                <span class="r num" data-l="Average day">{{ z.average | number: '1.1-1' }} kWh</span>
-                <span class="r num" data-l="December">{{ z.winter | number: '1.1-1' }} kWh</span>
-                <span class="r num" data-l="June">{{ z.summer | number: '1.1-1' }} kWh</span>
-              </div>
-            }
+          <p class="range-read num"><b>{{ winStart() === winEnd() ? 'No time chosen' : clock(winStart()) + ' to ' + clock(winEnd()) }}</b>@if (winStart() !== winEnd()) { <span class="muted">, {{ winHours().length }} hours</span> }</p>
+          <div class="seg zones" role="group" aria-label="Common windows">
+            @for (w of windowPresets; track w.label) { <button type="button" [attr.aria-pressed]="windowOn(w.start, w.end)" (click)="setWindow(w.start, w.end)">{{ w.label }} <span class="muted small">{{ clock(w.start) }} to {{ clock(w.end) }}</span></button> }
           </div>
           @if (zoneSize().size > 0) {
-            <p class="prose">To cover {{ zoneSel().length > 1 ? 'these times' : 'this time' }} you need about <b class="num">{{ zoneSize().needKwh | number: '1.1-1' }} kWh</b> of usable battery on an average day, which is <b class="num">{{ zoneSize().nominalKwh | number: '1.1-1' }} kWh</b> as sold (10% is kept in reserve).
+            @if (zoneSize().median; as m) {
+              <p class="hint">Sized on <b>your meter's median day</b>, so a few heavy days do not push the size up. Your average day is shown to compare.</p>
+              <dl class="rows win-rows">
+                <div><dt>You use in these hours (median day)</dt><dd class="num">{{ m.use | number: '1.1-1' }} kWh</dd></div>
+                <div><dt>Your panels cover directly</dt><dd class="num">-{{ m.use - m.need | number: '1.1-1' }} kWh</dd></div>
+                <div class="tot"><dt>Battery needs to supply (median day)</dt><dd class="num">{{ m.need | number: '1.1-1' }} kWh</dd></div>
+                <div><dt>Average day, all months</dt><dd class="num">{{ zoneSize().average | number: '1.1-1' }} kWh</dd></div>
+                <div><dt>December</dt><dd class="num">{{ zoneSize().winter | number: '1.1-1' }} kWh</dd></div>
+                <div><dt>June</dt><dd class="num">{{ zoneSize().summer | number: '1.1-1' }} kWh</dd></div>
+              </dl>
+              @if (zoneSize().average > m.need * 1.15) { <p class="hint">Your average is higher than your median, so some nights are much heavier than a normal one. A battery sized on the median will not cover those fully.</p> }
+              @else if (zoneSize().average < m.need * 0.85) { <p class="hint">Your average is lower than your median, so a normal night is heavier than most.</p> }
+            } @else {
+              <dl class="rows win-rows">
+                <div><dt>Average day</dt><dd class="num">{{ zoneSize().needKwh | number: '1.1-1' }} kWh</dd></div>
+                <div><dt>December</dt><dd class="num">{{ zoneSize().winter | number: '1.1-1' }} kWh</dd></div>
+                <div><dt>June</dt><dd class="num">{{ zoneSize().summer | number: '1.1-1' }} kWh</dd></div>
+              </dl>
+              <p class="hint">An estimate from your answers. Upload your ESB meter file and we will size it on your own median day instead.</p>
+            }
+          }
+          @if (zoneSize().size > 0) {
+            <p class="prose">To cover {{ clock(winStart()) }} to {{ clock(winEnd()) }} you need about <b class="num">{{ zoneSize().needKwh | number: '1.1-1' }} kWh</b> of usable battery on {{ zoneSize().basis === 'median' ? 'your median day' : 'an average day' }}, which is <b class="num">{{ zoneSize().nominalKwh | number: '1.1-1' }} kWh</b> as sold (10% is kept in reserve).
               @if (zoneSize().tooBig) { That is more than the largest single size we test ({{ zoneSize().size }} kWh), so you would need to stack batteries or cover fewer times. }
               @else { The nearest standard size is <b class="num">{{ zoneSize().size }} kWh</b>. }
               <button class="btn sm" type="button" (click)="useZoneSize()" [disabled]="cfg().batteryKwh === zoneSize().size">{{ cfg().batteryKwh === zoneSize().size ? 'Using ' + zoneSize().size + ' kWh' : 'Use ' + zoneSize().size + ' kWh' }}</button></p>
             <p class="hint">Your panels leave about <span class="num">{{ zoneInfo().surplusAverage | number: '1.1-1' }} kWh</span> a day over the year to charge it ({{ zoneInfo().surplusWinter | number: '1.1-1' }} kWh in December). That could fill about {{ pc(zoneSize().chargedAverage) }} of the need on an average day and {{ pc(zoneSize().chargedWinter) }} in December.@if (zoneSize().chargedWinter < 0.7) { In winter the sun will not fill it, so charging from the grid at the night rate would help. }</p>
           } @else {
-            <p class="hint">Choose at least one time of day to see a size.</p>
+            <p class="hint">Move the handles apart to choose some hours.</p>
           }
           <p class="hint">SEAI pays a €{{ grantsCfg.seaiBattery }} <a routerLink="/glossary" fragment="battery-grant">grant</a> towards a battery of {{ grantsCfg.seaiBatteryMinKwh }} kWh or more fitted by a registered solar installer, if your home qualifies. <a [href]="links.batteryGrant" target="_blank" rel="noopener noreferrer">SEAI battery grant</a></p>
           <details class="more">
