@@ -31,3 +31,8 @@ Matching to rated installers is by website domain or exact company name only, so
 ## Automatic SEAI refresh and backup
 `.github/workflows/seai-refresh.yml` runs every Monday and tries SEAI's CSV export once. On success it validates the data (it refuses a file that is much smaller than the current one), commits a sanitised backup (`data/seai/register-backup.csv`, no emails or phone numbers) plus the JSON, and triggers a deploy. Git history is the backup. If SEAI blocks the request, the site keeps serving the last good data and nothing else happens. A GitHub issue opens only if there has been no successful refresh for 90 days.
 SEAI currently serves a bot-check page to scripts, so the first successful run needs SEAI to allow it (see below) or a one-off local import with `npm run import:seai -- file.csv`. The raw download (`data/seai/latest.csv`) is git-ignored because it contains contact details.
+
+## Tests
+`npm test` runs the unit tests (Vitest) for the calculation engine, the ESB meter file parser, installer ranking and SEAI matching. They check energy balance (solar used + imported = demand), cost breakdown totals, SEAI grant rules, the connection-size limit, and strategy selection. The deploy workflow runs them first, so a failing calculation blocks a release.
+
+How sizing works: the recommendation never exceeds what your roof fits or what a standard home connection allows (about 6 kW single-phase, 11 kW three-phase), and "best value" will not generate more than about 125% of your yearly use, because exported power is worth less and less certain than power you use.

@@ -18,6 +18,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - run: npx ng test --watch=false
       - run: npx ng build
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:

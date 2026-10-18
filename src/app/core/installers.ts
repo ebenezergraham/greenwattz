@@ -41,9 +41,9 @@ export interface Ranked { installer: Installer; score: number; reputation: numbe
  * priority the user cares about, a verified score replaces the baseline when we have one.
  * Installers with fewer than `minReviews` Trustpilot reviews are left out.
  */
-export function rank(weights: Record<Priority, number>, minReviews = 100): Ranked[] {
+export function rank(weights: Record<Priority, number>, minReviews = 100, list: Installer[] = ALL): Ranked[] {
   const total = Object.values(weights).reduce((a, b) => a + b, 0) || 1;
-  return ALL
+  return list
     .filter((i) => (i.trustpilot?.count ?? 0) >= minReviews)
     .map((i) => {
       const reputation = adjusted(i.trustpilot!.score!, i.trustpilot!.count);
@@ -71,13 +71,13 @@ function domainOf(u?: string): string {
 }
 
 /** Finds the SEAI register entry by website domain, then by exact normalised name. Never fuzzy, to avoid false badges. */
-export function seaiMatch(i: Installer): SeaiCompany | undefined {
+export function seaiMatch(i: Installer, companies: SeaiCompany[] = SEAI.companies): SeaiCompany | undefined {
   const dom = i.domain.replace(/^www\./, '');
-  const byDomain = SEAI.companies.find((c) => domainOf(c.website) === dom);
+  const byDomain = companies.find((c) => domainOf(c.website) === dom);
   if (byDomain) return byDomain;
   const n = norm(i.seaiName ?? i.name);
   if (n.length < 2) return undefined;
-  return SEAI.companies.find((c) => { const m = norm(c.name); return m.length >= 2 && m === n; });
+  return companies.find((c) => { const m = norm(c.name); return m.length >= 2 && m === n; });
 }
 
 /** Reverse lookup: the rated installer (if any) for an SEAI company. */

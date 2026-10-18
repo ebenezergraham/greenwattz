@@ -1,7 +1,7 @@
 import { Injectable, computed, signal } from '@angular/core';
 import {
   Assumptions, Config, DEFAULT_ASSUMPTIONS, HomeInputs, NO_OBSTACLES, ObstacleKey, usableArea, obstacleArea, Usage, annualFromBill, buildGrid, cashflow,
-  estimateProfile, maxPanels, pickStrategies, simulate, withExtras,
+  estimateProfile, maxPanels, roofFitPanels, connectionLimitPanels, pickStrategies, simulate, withExtras,
 } from './engine';
 
 export type UsageMode = 'meter' | 'annual' | 'bill';
@@ -10,7 +10,7 @@ export type UsageMode = 'meter' | 'annual' | 'bill';
 @Injectable({ providedIn: 'root' })
 export class PlanStore {
   readonly home = signal<HomeInputs>({
-    occupancy: 'mixed', orientation: 'S', shading: 'none', roofAreaM2: 30, obstacles: { ...NO_OBSTACLES }, addEv: false, addHeatPump: false,
+    occupancy: 'mixed', orientation: 'S', shading: 'none', roofAreaM2: 30, obstacles: { ...NO_OBSTACLES }, threePhase: false, addEv: false, addHeatPump: false,
   });
   readonly assumptions = signal<Assumptions>({ ...DEFAULT_ASSUMPTIONS });
   readonly mode = signal<UsageMode>('annual');
@@ -41,6 +41,8 @@ export class PlanStore {
   );
   readonly flow = computed(() => cashflow(this.result(), this.assumptions()));
 
+  readonly roofFit = computed(() => roofFitPanels(this.home(), this.assumptions()));
+  readonly connectionCap = computed(() => connectionLimitPanels(this.home(), this.assumptions()));
   readonly usableArea = computed(() => usableArea(this.home()));
   readonly obstacleArea = computed(() => obstacleArea(this.home()));
   setObstacle(k: ObstacleKey, n: number) { this.patchHome({ obstacles: { ...this.home().obstacles, [k]: Math.max(0, n) } }); }

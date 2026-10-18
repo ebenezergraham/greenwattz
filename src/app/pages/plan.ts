@@ -90,6 +90,7 @@ export class PlanPage {
 
   print() { window.print(); }
   eur(n: number): string { return '€' + Math.round(n).toLocaleString('en-IE'); }
+  max0(n: number): number { return Math.max(0, n); }
   eur0(n: number): string { return this.eur(Math.round(n / 50) * 50); }
   payback(y: number): string { return isFinite(y) && y < 40 ? y.toFixed(1) + ' years' : 'Over 40 years'; }
   pc(n: number): string { return Math.round(n * 100) + '%'; }

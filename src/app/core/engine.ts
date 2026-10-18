@@ -79,6 +79,7 @@ export interface HomeInputs {
   shading: Shading;
   roofAreaM2: number; // roof area on the chosen side, before taking off obstacles
   obstacles: Obstacles;
+  threePhase: boolean; // three-phase supply allows a larger connection
   addEv: boolean;
   addHeatPump: boolean;
 }
@@ -197,6 +198,7 @@ export interface Result {
   grossCost: number;
   grossLow: number;
   grossHigh: number;
+  breakdown: CostRow[];
   grant: number;
   netCost: number;
   paybackYears: number;
@@ -211,15 +213,61 @@ export function seaiGrantFor(kwp: number): number {
   return Math.min(1800, Math.round(first + second));
 }
 
+export interface CostRow { key: string; label: string; note: string; group: 'solar' | 'battery'; mid: number; low: number; high: number }
+
+interface RowSpec { key: string; label: string; note: string; group: 'solar' | 'battery'; perKwp?: number; base?: number; perKwh?: number; baseBattery?: number; lo: number; hi: number }
+
+/**
+ * Shares of the editable cost assumptions. perKwp shares sum to 1 across the solar rows, base shares sum to 1,
+ * so changing "cost per kWp" or "cost base" in the assumptions scales the whole breakdown. lo and hi give each
+ * line its own typical spread between cheap and expensive installers.
+ */
+const ROWS: RowSpec[] = [
+  { key: 'panels', label: 'Solar panels', note: 'The panels themselves. Brand and efficiency change the price.', group: 'solar', perKwp: 260 / 1250, lo: 0.9, hi: 1.2 },
+  { key: 'inverter', label: 'Inverter', note: 'Turns panel output into household power. Hybrid models cost more.', group: 'solar', perKwp: 250 / 1250, lo: 0.9, hi: 1.2 },
+  { key: 'mounting', label: 'Mounting and fixings', note: 'Rails, roof hooks and weatherproofing for your roof type.', group: 'solar', perKwp: 160 / 1250, lo: 0.9, hi: 1.15 },
+  { key: 'labour', label: 'Installation labour', note: 'Roof and electrical crew time. Grows with system size.', group: 'solar', perKwp: 450 / 1250, lo: 0.85, hi: 1.2 },
+  { key: 'electrical', label: 'Electrical work and cabling', note: 'Cabling, protection devices, and consumer unit changes.', group: 'solar', perKwp: 130 / 1250, base: 600 / 2200, lo: 0.85, hi: 1.2 },
+  { key: 'access', label: 'Scaffolding and roof access', note: 'Usually a fixed charge. Higher for tall or awkward roofs.', group: 'solar', base: 800 / 2200, lo: 0.8, hi: 1.3 },
+  { key: 'admin', label: 'Design, grid application, commissioning', note: 'Survey, ESB Networks notification, testing and handover.', group: 'solar', base: 450 / 2200, lo: 0.9, hi: 1.2 },
+  { key: 'cover', label: 'Insurance, warranty and contingency', note: 'Cover on the work and an allowance for surprises.', group: 'solar', base: 350 / 2200, lo: 0.9, hi: 1.25 },
+  { key: 'battery', label: 'Battery', note: 'Priced by capacity (kWh). Cost per kWh falls as batteries get larger.', group: 'battery', perKwh: 1, lo: 0.85, hi: 1.2 },
+  { key: 'battery-install', label: 'Battery installation and gateway', note: 'Wiring, mounting, controls and commissioning.', group: 'battery', baseBattery: 1, lo: 0.85, hi: 1.25 },
+];
+
+/** Itemised installed cost with a typical low to high range for each line. Empty when there are no panels. */
+export function costBreakdown(kwp: number, battery: number, a: Assumptions): CostRow[] {
+  if (kwp <= 0) return [];
+  const out: CostRow[] = [];
+  for (const r of ROWS) {
+    if (r.group === 'battery' && battery <= 0) continue;
+    const mid = Math.round(
+      (r.base ?? 0) * a.panelCostBase + (r.perKwp ?? 0) * a.panelCostPerKwp * kwp +
+      (r.baseBattery ?? 0) * a.batteryCostBase + (r.perKwh ?? 0) * a.batteryCostPerKwh * battery,
+    );
+    out.push({ key: r.key, label: r.label, note: r.note, group: r.group, mid, low: Math.round(mid * r.lo), high: Math.round(mid * r.hi) });
+  }
+  return out;
+}
+
 export function systemCost(kwp: number, battery: number, a: Assumptions): number {
-  if (kwp <= 0) return 0;
-  const pv = a.panelCostBase + a.panelCostPerKwp * kwp;
-  const bat = battery > 0 ? a.batteryCostBase + a.batteryCostPerKwh * battery : 0;
-  return Math.round(pv + bat);
+  return costBreakdown(kwp, battery, a).reduce((t, r) => t + r.mid, 0);
+}
+
+/** ESB Networks limits a home connection by inverter size: about 6 kVA single-phase, 11 kVA three-phase. */
+export const CONNECTION_LIMIT_KW = { single: 6, three: 11 };
+
+export function connectionLimitPanels(home: HomeInputs, a: Assumptions): number {
+  const kw = home.threePhase ? CONNECTION_LIMIT_KW.three : CONNECTION_LIMIT_KW.single;
+  return Math.floor((kw * 1000) / a.panelWatts);
+}
+
+export function roofFitPanels(home: HomeInputs, a: Assumptions): number {
+  return Math.floor(usableArea(home) / a.panelAreaM2);
 }
 
 export function maxPanels(home: HomeInputs, a: Assumptions): number {
-  return Math.max(2, Math.min(30, Math.floor(usableArea(home) / a.panelAreaM2)));
+  return Math.max(2, Math.min(30, roofFitPanels(home, a), connectionLimitPanels(home, a)));
 }
 
 /** Simulate a typical day per month at hourly steps. */
@@ -278,7 +326,10 @@ export function simulate(usage: Usage, home: HomeInputs, a: Assumptions, cfg: Co
     monthlyDemand.push(dDemand * days);
   }
 
-  const gross = systemCost(kwp, cap, a);
+  const breakdown = costBreakdown(kwp, cap, a);
+  const gross = breakdown.reduce((t, r) => t + r.mid, 0);
+  const grossLow = breakdown.reduce((t, r) => t + r.low, 0);
+  const grossHigh = breakdown.reduce((t, r) => t + r.high, 0);
   const grant = a.seaiGrant && kwp > 0 ? seaiGrantFor(kwp) : 0;
   const net = Math.max(0, gross - grant);
   const saving = billBefore - billAfter;
@@ -289,7 +340,7 @@ export function simulate(usage: Usage, home: HomeInputs, a: Assumptions, cfg: Co
     selfSufficiency: baseImp ? self / baseImp : 0,
     selfConsumption: gen ? self / gen : 0,
     billBefore, billAfter, billSaving: saving, exportIncome, annualBenefit: benefit,
-    grossCost: gross, grossLow: Math.round(gross * 0.88), grossHigh: Math.round(gross * 1.15),
+    grossCost: gross, grossLow, grossHigh, breakdown,
     grant, netCost: net,
     paybackYears: benefit > 0 ? net / benefit : Infinity,
     monthlyGen, monthlyDemand,
@@ -305,23 +356,34 @@ export const BATTERY_OPTIONS = [0, 5, 10, 15];
 export function buildGrid(usage: Usage, home: HomeInputs, a: Assumptions): Result[] {
   const max = maxPanels(home, a);
   const out: Result[] = [];
-  for (let p = 4; p <= max; p += 2) for (const b of BATTERY_OPTIONS) out.push(simulate(usage, home, a, { panels: p, batteryKwh: b }));
-  if (!out.length) out.push(simulate(usage, home, a, { panels: Math.min(4, max), batteryKwh: 0 }));
+  const sizes: number[] = [];
+  for (let p = Math.min(4, max); p <= max; p += 2) sizes.push(p);
+  if (sizes[sizes.length - 1] !== max) sizes.push(max);
+  for (const p of sizes) for (const b of BATTERY_OPTIONS) out.push(simulate(usage, home, a, { panels: p, batteryKwh: b }));
   return out;
 }
+
+/** How far above a home's own yearly use the generation may go before we stop recommending more panels. */
+export const BEST_MAX_GEN_RATIO = 1.25;
+export const BOLD_MAX_GEN_RATIO = 1.5;
 
 export function pickStrategies(grid: Result[], years = 20): Scenario[] {
   const value = (r: Result) => r.annualBenefit * years * 0.92 - r.netCost; // 8% allowance for degradation
   const viable = grid.filter((r) => isFinite(r.paybackYears));
   const pool = viable.length ? viable : grid;
+  // Selling surplus power is worth less and less certain than using it, so cap how much we oversize.
+  const within = (ratio: number) => {
+    const ok = pool.filter((r) => r.generationKwh <= ratio * r.baselineImportKwh);
+    return ok.length ? ok : [[...pool].sort((x, y) => x.generationKwh - y.generationKwh)[0]];
+  };
   const lean = [...pool].sort((x, y) => x.netCost - y.netCost)[0];
-  const best = [...pool].sort((x, y) => value(y) - value(x))[0];
-  const bold = [...pool].sort((x, y) => y.selfSufficiency - x.selfSufficiency || value(y) - value(x))
+  const best = [...within(BEST_MAX_GEN_RATIO)].sort((x, y) => value(y) - value(x))[0];
+  const bold = [...within(BOLD_MAX_GEN_RATIO)].sort((x, y) => y.selfSufficiency - x.selfSufficiency || value(y) - value(x))
     .filter((r) => value(r) > -0.2 * r.netCost)[0] ?? best;
   const mk = (r: Result, key: string, label: string, blurb: string): Scenario => ({ ...r, key, label, blurb });
   return [
     mk(lean, 'lean', 'Lowest outlay', 'Smallest spend that still pays its way.'),
-    mk(best, 'best', 'Best value', 'Highest return over 20 years.'),
+    mk(best, 'best', 'Best value', 'Highest return without oversizing for exports.'),
     mk(bold, 'bold', 'Most independent', 'Covers as much of your usage as sensible.'),
   ];
 }

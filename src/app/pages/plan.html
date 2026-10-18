@@ -87,6 +87,11 @@
           </div>
 
           <div class="field">
+            <span class="lbl">Your electricity connection</span>
+            <label class="check"><input type="checkbox" [checked]="s.home().threePhase" (change)="s.patchHome({ threePhase: $any($event.target).checked })" /><span>My home has a three-phase supply <span class="muted small">(uncommon in homes. Most are single-phase, which limits a system to about 6 kW. Three-phase allows up to 11 kW.)</span></span></label>
+          </div>
+
+          <div class="field">
             <span class="lbl">Planning to add soon?</span>
             <label class="check"><input type="checkbox" [checked]="s.home().addEv" (change)="s.patchHome({ addEv: $any($event.target).checked })" /><span>An electric car <span class="muted small">(adds about 2,600 kWh a year, mostly overnight)</span></span></label>
             <label class="check"><input type="checkbox" [checked]="s.home().addHeatPump" (change)="s.patchHome({ addHeatPump: $any($event.target).checked })" /><span>A heat pump <span class="muted small">(adds about 3,500 kWh a year, mostly winter)</span></span></label>
@@ -155,6 +160,9 @@
         <h1>Your solar strategy</h1>
         <p class="muted lead">We tested every panel and battery combination that fits your roof. Pick a starting point, then adjust.</p>
 
+        @if (s.roofFit() > s.maxPanels()) {
+          <div class="notice info"><i class="ph ph-info"></i><span>Your roof could fit about {{ s.roofFit() }} panels, but a standard {{ s.home().threePhase ? 'three-phase' : 'single-phase' }} home connection limits a system to about {{ s.home().threePhase ? 11 : 6 }} kW ({{ s.connectionCap() }} panels). We never suggest more than your connection allows.</span></div>
+        }
         <div class="strats">
           @for (x of s.strategies(); track x.key) {
             <button type="button" class="strat" [class.best]="x.key === 'best'" [attr.aria-pressed]="isPicked(x)" (click)="pickStrategy(x)">
@@ -231,6 +239,30 @@
             </dl>
           </div>
         </div>
+
+        <div class="card top">
+          <h3>Where the money goes</h3>
+          <p class="muted small bottom">Typical installed prices for a system this size. Ranges run from cheaper to pricier installers, and your quotes will vary. The SEAI grant comes off at the end.</p>
+          <div class="tablewrap">
+            <table class="costs">
+              <thead><tr><th>Item</th><th class="r">Typical</th><th class="r">Range</th></tr></thead>
+              <tbody>
+                @for (row of r().breakdown; track row.key) {
+                  <tr><td><b>{{ row.label }}</b><span class="small muted">{{ row.note }}</span></td><td class="r num">{{ eur(row.mid) }}</td><td class="r num">{{ eur(row.low) }} to {{ eur(row.high) }}</td></tr>
+                }
+              </tbody>
+              <tfoot>
+                <tr><td>Installed total</td><td class="r num">{{ eur(r().grossCost) }}</td><td class="r num">{{ eur(r().grossLow) }} to {{ eur(r().grossHigh) }}</td></tr>
+                <tr><td>Less SEAI grant</td><td class="r num">{{ r().grant ? '-' + eur(r().grant) : 'Not applied' }}</td><td></td></tr>
+                <tr class="tot"><td>You pay</td><td class="r num">{{ eur(r().netCost) }}</td><td class="r num">{{ eur(max0(r().grossLow - r().grant)) }} to {{ eur(max0(r().grossHigh - r().grant)) }}</td></tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+
+        @if (r().exportIncome > 400) {
+          <div class="notice top"><i class="ph ph-warning"></i><span>This plan earns about {{ eur0(r().exportIncome) }} a year from exports. The first €400 a year has been tax-exempt, but income above that may be taxable. Check Revenue's current rules.</span></div>
+        }
 
         <div class="card top">
           <button class="disclose" type="button" (click)="showAssump.set(!showAssump())" [attr.aria-expanded]="showAssump()">

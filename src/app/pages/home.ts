@@ -93,7 +93,7 @@ import { DEFAULT_ASSUMPTIONS, HomeInputs, buildGrid, estimateProfile, pickStrate
 })
 export class HomePage {
   readonly kwh = signal(4200);
-  private home: HomeInputs = { occupancy: 'mixed', orientation: 'S', shading: 'none', roofAreaM2: 30, obstacles: { chimney: 0, skylight: 0, vent: 0, dish: 0, dormer: 0, thermal: 0 }, addEv: false, addHeatPump: false };
+  private home: HomeInputs = { occupancy: 'mixed', orientation: 'S', shading: 'none', roofAreaM2: 30, obstacles: { chimney: 0, skylight: 0, vent: 0, dish: 0, dormer: 0, thermal: 0 }, threePhase: false, addEv: false, addHeatPump: false };
   readonly best = computed(() => {
     const u = { annualKwh: this.kwh(), profile: estimateProfile(this.kwh(), 'mixed'), source: 'estimate' as const };
     return pickStrategies(buildGrid(u, this.home, DEFAULT_ASSUMPTIONS))[1];

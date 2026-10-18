@@ -203,6 +203,7 @@ export class QuotePage {
       `Yearly electricity use: about ${Math.round(u.annualKwh)} kWh`,
       `Suggested system: ${r.panels} panels (${r.kwp.toFixed(1)} kWp)${r.batteryKwh ? ' with a ' + r.batteryKwh + ' kWh battery' : ', no battery'}`,
       `Roof: faces ${ori}, shade ${h.shading}, about ${Math.round(this.store.usableArea())} m2 usable after obstacles${this.obstacleText()}`,
+      `Supply: ${h.threePhase ? 'three-phase' : 'single-phase'}`,
       `Planning to add: ${[h.addEv && 'EV', h.addHeatPump && 'heat pump'].filter(Boolean).join(' and ') || 'nothing yet'}`,
       `Most important to me: ${top.length ? top.join(', ') : 'a balanced quote'}`,
       'Please itemise the quote, list panel, inverter and battery brands, and give warranty lengths in writing.',

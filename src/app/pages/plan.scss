@@ -55,3 +55,12 @@
 .obs .name { display: grid; gap: 0; font-weight: 600; .small { font-weight: 400; } }
 .obs .step { display: flex; align-items: center; gap: 12px; output { min-width: 1.5ch; text-align: center; font-weight: 650; font-size: 1.1rem; } .btn { min-width: 40px; padding: 0; } }
 .roomline { margin-top: 6px; padding: 12px 14px; border-radius: var(--r-ctl); background: var(--accent-soft); }
+
+.tablewrap { overflow-x: auto; }
+.costs { width: 100%; border-collapse: collapse; min-width: 520px; font-size: 0.95rem; }
+.costs th { text-align: left; font-weight: 600; color: var(--ink-2); padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.costs td { padding: 10px; vertical-align: top; border-bottom: 1px solid var(--line); }
+.costs td b { display: block; font-weight: 600; }
+.costs .r { text-align: right; white-space: nowrap; }
+.costs tfoot td { font-weight: 600; }
+.costs tfoot .tot td { font-size: 1.1rem; border-bottom: 0; }
