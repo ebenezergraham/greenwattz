@@ -1316,7 +1316,7 @@ describe('strategy templates', () => {
   });
   it('keeps battery-free strategies free of a battery and gives the others one', () => {
     for (const k of ['lowest', 'daytime', 'export']) expect(res(k).batteryKwh).toBe(0);
-    for (const k of ['evening', 'night-rate', 'independent']) expect(res(k).batteryKwh).toBeGreaterThan(0);
+    for (const k of ['evening', 'solar-first', 'night-rate', 'independent']) expect(res(k).batteryKwh).toBeGreaterThan(0);
   });
   it('covers more of your use the more independent the strategy', () => {
     expect(res('evening').selfSufficiency).toBeGreaterThan(res('daytime').selfSufficiency);
@@ -1449,5 +1449,36 @@ describe('roof direction from a compass bearing', () => {
   it('matches the direction factors: south best, north worst', () => {
     expect(orientationFactor(orientationFromBearing(180))).toBeGreaterThan(orientationFactor(orientationFromBearing(90)));
     expect(orientationFactor(orientationFromBearing(90))).toBeGreaterThan(orientationFactor(orientationFromBearing(0)));
+  });
+});
+
+describe('solar, battery, then export strategy', () => {
+  const big = () => ({ ...home(), roofAreaM2: 110, threePhase: true });
+  const res = (key: string, h = big()) => templateResult(STRATEGY_TEMPLATES.find((t) => t.key === key)!, usage(), h, { ...A });
+  it('has a battery that is charged from solar only, never from the grid', () => {
+    const t = STRATEGY_TEMPLATES.find((x) => x.key === 'solar-first')!;
+    expect(t.gridCharge).toBe(false);
+    const r = res('solar-first');
+    expect(r.batteryKwh).toBeGreaterThan(0);
+    expect(r.selfUseKwh).toBeLessThanOrEqual(r.generationKwh + 1e-6);
+  });
+  it('uses solar for the house first, then the battery, and exports the rest', () => {
+    const r = res('solar-first');
+    expect(r.supply.direct).toBeGreaterThan(0);
+    expect(r.supply.battery).toBeGreaterThan(0);
+    expect(r.exportKwh).toBeGreaterThan(0);
+    expect(r.selfUseKwh + r.exportKwh).toBeLessThanOrEqual(r.generationKwh + 1e-6); // the rest is losses in the battery
+  });
+  it('earns the tax-free export allowance, doubling it for two people', () => {
+    expect(res('solar-first').exportIncome).toBeGreaterThanOrEqual(600);
+    expect(res('solar-first', { ...big(), taxpayers: 2 }).exportIncome).toBeGreaterThanOrEqual(1200);
+  });
+  it('uses more panels than the evening battery strategy, because it also sells surplus', () => {
+    expect(res('solar-first').panels).toBeGreaterThanOrEqual(res('evening').panels);
+    expect(res('solar-first').exportIncome).toBeGreaterThanOrEqual(res('evening').exportIncome);
+  });
+  it('keeps a battery where the export strategy has none', () => {
+    expect(res('solar-first').batteryKwh).toBeGreaterThan(0);
+    expect(res('export').batteryKwh).toBe(0);
   });
 });
