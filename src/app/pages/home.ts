@@ -79,6 +79,7 @@ import { DayChart } from '../ui/charts';
           <li><a [routerLink]="['/blog', latest.slug]">{{ latest.title }}</a></li>
           <li><a routerLink="/glossary">Glossary</a><span class="muted small">kWp, MPRN, SEAI grants and more, in plain English.</span></li>
           <li><a routerLink="/check-quote">Check a solar quote</a><span class="muted small">See if the price per kWp is fair for Ireland.</span></li>
+          <li><a routerLink="/compare-quotes">Compare your quotes</a><span class="muted small">Side by side, with red flags in the contract terms.</span></li>
           <li><a routerLink="/reviews">Installer ratings</a><span class="muted small">Trustpilot and Google scores side by side.</span></li>
         </ul>
       </div>

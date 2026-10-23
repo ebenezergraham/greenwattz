@@ -824,7 +824,18 @@ export const BOLD_MAX_GEN_RATIO = 1.5;
 /** What the household wants from the system: the share of its own use covered, and the export income it hopes for. */
 export type Lean = 'solar' | 'balanced' | 'battery';
 export type BatteryMode = 'any' | 'none' | 'required';
-export interface Goals { cover: number; exportIncome: number; /** Which way to tip the mix when several meet the goals. Balanced picks the cheapest. */ lean?: Lean; /** Whether the mix may, may not, or must include a battery. */ battery?: BatteryMode }
+export interface Goals {
+  cover: number;
+  exportIncome: number;
+  /** Which way to tip the mix when several meet the goals. Balanced picks the cheapest. */
+  lean?: Lean;
+  /** Whether the mix may, may not, or must include a battery. */
+  battery?: BatteryMode;
+  /** The most the system may cost after grants, in euro. Unset or 0 means no limit. */
+  maxNetCost?: number;
+  /** Yearly generation as a share of yearly use that must be reached. 1 is net zero. Unset or 0 means no target. */
+  generate?: number;
+}
 export const DEFAULT_GOALS: Goals = { cover: 0.6, exportIncome: 0, lean: 'balanced', battery: 'required' };
 
 export function pickStrategies(grid: Result[], exportExtra = false, goals: Goals = DEFAULT_GOALS): Scenario[] {
@@ -841,12 +852,18 @@ export function pickStrategies(grid: Result[], exportExtra = false, goals: Goals
 
   // Size from the goals, not from the roof: the cheapest panel and battery pair that covers the share of use asked
   // for and earns the export income asked for. An export goal lifts the oversizing cap, since it asks for surplus.
-  const meets = (r: Result) => r.selfSufficiency >= goals.cover - 1e-9 && r.exportIncome >= goals.exportIncome - 1e-9;
+  const budget = goals.maxNetCost && goals.maxNetCost > 0 ? goals.maxNetCost : Infinity;
+  const target = goals.generate && goals.generate > 0 ? goals.generate : 0;
+  const meets = (r: Result) => r.selfSufficiency >= goals.cover - 1e-9 && r.exportIncome >= goals.exportIncome - 1e-9 && (!target || r.generationKwh >= target * r.baselineImportKwh - 1e-6);
   const allowed = (r: Result) => goals.battery === 'none' ? r.batteryKwh === 0 : goals.battery === 'required' ? r.batteryKwh > 0 : true;
-  const base = goals.exportIncome > 0 ? pool : within(BEST_MAX_GEN_RATIO);
+  // A generation target asks for as much power as the home uses, which may be over the usual oversizing cap.
+  const base = goals.exportIncome > 0 || target > 0 ? pool : within(BEST_MAX_GEN_RATIO);
   const candidates = base.filter(allowed).length ? base.filter(allowed) : base;
-  const hits = candidates.filter(meets);
-  const progress = (r: Result) => Math.min(1, r.selfSufficiency / Math.max(goals.cover, 1e-9)) + (goals.exportIncome > 0 ? Math.min(1, r.exportIncome / goals.exportIncome) : 0);
+  // A budget keeps the choice to what can be afforded. If nothing fits, the cheapest option is shown and flagged.
+  const affordable = candidates.filter((r) => r.netCost <= budget);
+  const field = affordable.length ? affordable : candidates;
+  const hits = affordable.length ? field.filter(meets) : [];
+  const progress = (r: Result) => Math.min(1, r.selfSufficiency / Math.max(goals.cover, 1e-9)) + (goals.exportIncome > 0 ? Math.min(1, r.exportIncome / goals.exportIncome) : 0) + (target ? Math.min(1, r.generationKwh / (target * r.baselineImportKwh)) : 0);
   // Among the systems that meet the goals: balanced is the cheapest, "more solar" uses the least battery, and
   // "more battery" uses the fewest panels, with cost breaking ties.
   const order = (x: Result, y: Result) => goals.lean === 'solar'
@@ -856,13 +873,15 @@ export function pickStrategies(grid: Result[], exportExtra = false, goals: Goals
       : x.netCost - y.netCost || value(y) - value(x);
   const best = hits.length
     ? [...hits].sort(order)[0]
-    : [...candidates].sort((x, y) => progress(y) - progress(x) || x.netCost - y.netCost)[0];
+    : affordable.length
+      ? [...field].sort((x, y) => progress(y) - progress(x) || x.netCost - y.netCost)[0]
+      : [...candidates].sort((x, y) => x.netCost - y.netCost)[0];
   const bold = [...within(BOLD_MAX_GEN_RATIO)].sort((x, y) => y.selfSufficiency - x.selfSufficiency || value(y) - value(x))
     .filter((r) => value(r) > -0.2 * r.netCost)[0] ?? best;
   const mk = (r: Result, key: string, label: string, blurb: string, meetsGoals?: boolean): Scenario => ({ ...r, key, label, blurb, meetsGoals });
   return [
     mk(lean, 'lean', 'Lowest outlay', 'Smallest spend that still pays its way.'),
-    mk(best, 'best', 'Right size', hits.length ? 'Smallest system that meets your coverage and export goals.' : 'Gets closest to your goals within your roof and connection.', hits.length > 0),
+    mk(best, 'best', 'Right size', hits.length ? 'Smallest system that meets your goals.' : !affordable.length ? 'Nothing fits your budget, so this is the cheapest option.' : 'Gets closest to your goals within your roof, connection and budget.', hits.length > 0),
     mk(bold, 'bold', 'Most independent', 'Covers as much of your usage as sensible.'),
   ];
 }
@@ -1018,6 +1037,8 @@ export const STRATEGY_TEMPLATES: StrategyTemplate[] = [
   { key: 'solar-first', label: 'Solar, battery, then export', blurb: 'Solar runs the house, then fills the battery, and the rest is sold.', goals: (h) => ({ cover: 0.6, exportIncome: 600 * h.taxpayers, lean: 'balanced', battery: 'required' }), exportExtra: true, gridCharge: false },
   { key: 'night-rate', label: 'Battery charged at the night rate', blurb: 'The battery tops up overnight on cheap power and covers dear hours.', goals: () => ({ cover: 0.65, exportIncome: 0, lean: 'balanced', battery: 'required' }), exportExtra: false, gridCharge: true, needsTimeOfUse: true },
   { key: 'export', label: 'Solar for export income', blurb: 'More panels than you use, to sell the surplus tax-free.', goals: (h) => ({ cover: 0.4, exportIncome: 600 * h.taxpayers, lean: 'solar', battery: 'none' }), exportExtra: true, gridCharge: false },
+  { key: 'budget', label: 'Most cover for my budget', blurb: 'Spend up to a set amount after grants and get as much of your use covered as it buys.', goals: () => ({ cover: 0.9, exportIncome: 0, lean: 'balanced', battery: 'any', maxNetCost: 10000 }), exportExtra: false, gridCharge: false },
+  { key: 'net-zero', label: 'Net zero over a year', blurb: 'Generate as much power in a year as your home uses, and sell what you do not use.', goals: () => ({ cover: 0.5, exportIncome: 0, lean: 'balanced', battery: 'any', generate: 1 }), exportExtra: true, gridCharge: false },
   { key: 'independent', label: 'Near independence', blurb: 'Big battery and more panels to supply most of your use. Still on the grid.', goals: () => ({ cover: 0.85, exportIncome: 0, lean: 'balanced', battery: 'required' }), exportExtra: true, gridCharge: false },
 ];
 

@@ -1,7 +1,6 @@
 import { Routes } from '@angular/router';
 import { HomePage } from './pages/home';
 import { PlanPage, stepIndex } from './pages/plan';
-import { QuoteCheckPage } from './pages/quote-check';
 import { GuidePage } from './pages/guide';
 import { ProviderPage, ReviewsPage } from './pages/reviews';
 import { QuotePage } from './pages/quote';
@@ -27,7 +26,8 @@ export const routes: Routes = [
   { path: 'blog/:slug', component: PostPage, title: (route) => { const p = postBySlug(route.paramMap.get('slug')); return (p ? p.title : 'Article not found') + ' | GreenWattz'; } },
   { path: 'glossary', component: GlossaryPage, title: 'Solar glossary for Irish homeowners | GreenWattz' },
   { path: 'quote', component: QuotePage, title: 'Find installers | GreenWattz' },
-  { path: 'check-quote', component: QuoteCheckPage, title: 'Is your solar quote a fair price? | GreenWattz' },
+  { path: 'compare-quotes', loadComponent: () => import('./pages/quote-compare').then((m) => m.QuoteComparePage), title: 'Compare your solar quotes | GreenWattz' },
+  { path: 'check-quote', loadComponent: () => import('./pages/quote-check').then((m) => m.QuoteCheckPage), title: 'Is your solar quote a fair price? | GreenWattz' },
   { path: 'privacy', component: PrivacyPage, title: 'Privacy policy | GreenWattz' },
   { path: 'cookies', component: CookiesPage, title: 'Cookie policy | GreenWattz' },
   { path: '**', redirectTo: '' },

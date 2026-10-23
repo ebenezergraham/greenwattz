@@ -1,4 +1,5 @@
 <div class="wrap plan">
+  <input id="lp" class="sr" type="file" accept=".json,application/json" (change)="loadPlan($event)" />
   <nav class="steps no-print" aria-label="Plan progress">
     <ol>
       @for (t of steps; track t; let i = $index) {
@@ -194,6 +195,7 @@
         <h1>Your electricity use</h1>
         <p class="sub">Smart meter data is best because it shows when you use power, not just how much.</p>
 
+        <p class="hint">Back again? <label for="lp" class="linklike">Load a saved plan</label>.</p>
         <p class="firstest" role="status">A first estimate for a home like yours: about <b class="num">{{ eur0(r().netCost) }}</b>{{ grantsPending() ? ' before grants' : ' after grants' }}, paying back in <b class="num">{{ payback(r().paybackYears) }}</b>. Tell us a little more and it becomes yours.</p>
 
         <div class="choices" role="group" aria-label="How do you want to tell us?">
@@ -359,8 +361,12 @@
         <div class="next no-print">
           <a class="btn primary" routerLink="/quote">Find installers to quote</a>
           <a class="btn" routerLink="/check-quote">Check a quote you have</a>
+          <a class="btn" routerLink="/compare-quotes">Compare your quotes</a>
+          <button class="btn" type="button" (click)="savePlan()">Save my plan</button>
+          <label for="lp" class="btn">Load a plan</label>
           <button class="btn" type="button" (click)="print()">Save as PDF</button>
         </div>
+        @if (planMessage()) { <p class="hint" role="status">{{ planMessage() }}</p> }
         <p class="hint">Typical installed range before grants: {{ eur0(r().grossLow) }} to {{ eur0(r().grossHigh) }}. The yearly benefit is {{ eur0(r().billSaving) }} off your bill plus {{ eur0(r().exportIncome - r().exportTax) }} from exports{{ r().exportTax ? ' after tax' : ', tax-free' }}.</p>
         <estimate-note />
 
@@ -420,6 +426,25 @@
                 </div>
                 <p class="hint">Money from selling surplus power. Export is tax-free up to {{ eur0(s.assumptions().exportTaxFreePerPerson * s.home().taxpayers) }} a year for {{ s.home().taxpayers === 1 ? 'one person' : 'two people' }}. A goal here asks for more panels than your own use needs.</p>
               </div>
+            </div>
+          </div>
+          <div class="q">
+            <span class="ql" id="bud">Budget after grants</span>
+            <div class="qc">
+              <div class="seg" role="group" aria-labelledby="bud">
+                @for (b of budgets; track b) { <button type="button" [attr.aria-pressed]="(s.goals().maxNetCost ?? 0) === b" (click)="setBudget(b)">{{ b ? eur0(b) : 'No limit' }}</button> }
+              </div>
+              <p class="hint">The most you want to spend after SEAI grants. We pick the best mix that fits, or the closest if your other goals cost more.</p>
+            </div>
+          </div>
+          <div class="q">
+            <span class="ql" id="nz">Net zero</span>
+            <div class="qc">
+              <div class="seg" role="group" aria-labelledby="nz">
+                <button type="button" [attr.aria-pressed]="!s.goals().generate" (click)="s.goals().generate && toggleNetZero()">Not needed</button>
+                <button type="button" [attr.aria-pressed]="!!s.goals().generate" (click)="!s.goals().generate && toggleNetZero()">Generate what I use</button>
+              </div>
+              <p class="hint">Makes enough power over a year to match your yearly use. It may need more panels than your connection normally allows, so also choose "Add extra panels to export" below if it says it cannot reach it.</p>
             </div>
           </div>
           <div class="q">

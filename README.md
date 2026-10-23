@@ -67,6 +67,15 @@ Every price, grant and rate behind the estimates lives in `src/app/data/prices.j
 - **Reading a quote:** a PDF or text file is read in the browser (`core/pdf-text.ts`, using pdf.js, loaded only on upload). Plain rules (`readQuoteText`) pull out panels, watts, kWp, battery, totals and grants. If the browser has built-in AI (Chrome's Prompt API, `core/browser-ai.ts`), it reads the quote too, on the device. Any number the AI returns that is not literally in the quote text is dropped (`acceptAiFields`), and every figure is shown to the user to confirm before it is used. Photos and scans are not supported.
 - **Support link:** set `supportUrl` in `core/site.ts` to your Buy Me a Coffee page. While it is empty, every support link is hidden.
 
+## Compare your quotes
+`/compare-quotes` puts up to five quotes side by side (`pages/quote-compare.ts`, logic in `core/quote-compare.ts`). Each is checked against the community price range, run through our own model for the visitor's home (roof direction, usage and home year, shared with the planner) so the installer's yearly kWh, saving and payback claims can be sanity-checked, and scanned for contract red flags: a large deposit, nearly everything paid before the works, a short workmanship warranty, a short cancellation window, forfeits, a grant paid afterwards, a quote and terms that disagree on payment, a contract grant rule the home does not meet, and claims well above our estimate.
+
+- **Reading a file:** the same reader as the quote checker, plus `core/quote-terms.ts`, which pulls deposit, payment schedule, warranties, cancellation, grant route and grant-year rule out of the quote and its terms. Whatever it finds is shown for confirmation before it becomes a column, and every cell can be edited.
+- **Nothing is stored.** Quotes live in the page. "Save as file" and "Load a file" keep them as a JSON file the visitor holds; loading validates and clamps every value.
+
+## Save and load a plan
+The planner has "Save my plan" and "Load a plan" (`core/plan-file.ts`). The file holds the answers (usage figure, home, rates, goals, chosen system) and never meter readings. It is a download, not storage, so the privacy promise holds.
+
 ## Blog and glossary
 - **Posts** are plain data in `src/app/data/posts.ts`. Add an object with a slug, title, description, date, takeaways, blocks and sources, and it appears at `/blog` and `/blog/<slug>`. Text supports `**bold**` and `[label](url)`; internal links are checked by tests.
 - **Glossary** terms live in `src/app/data/glossary.ts`. Link to a term from anywhere with `[MPRN](/glossary#mprn)`.

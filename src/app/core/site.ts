@@ -15,7 +15,7 @@ export const SITE = {
    * Where "Buy me a coffee" points, for example https://buymeacoffee.com/yourname. Leave empty to hide every support link.
    * It is a plain link, so nothing loads from Buy Me a Coffee until someone clicks it.
    */
-  supportUrl: '',
+  supportUrl: 'https://buymeacoffee.com/greenwattz.eu',
   /** Operator details shown in the privacy policy. Replace before launch. */
   operator: '[Your legal name or company], Ireland',
   lastUpdated: '18 October 2026',

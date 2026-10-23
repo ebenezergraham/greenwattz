@@ -57,6 +57,7 @@ const KEY = 'greenwattz.consent.v1';
             <b>Learn</b>
             <a routerLink="/blog">Guides</a>
             <a routerLink="/check-quote">Check a solar quote</a>
+            <a routerLink="/compare-quotes">Compare your quotes</a>
             <a routerLink="/glossary">Glossary</a>
             <a routerLink="/estimates">How we estimate</a>
             <a routerLink="/guide/esb-data">Get your ESB data</a>

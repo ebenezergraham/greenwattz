@@ -1482,3 +1482,48 @@ describe('solar, battery, then export strategy', () => {
     expect(res('export').batteryKwh).toBe(0);
   });
 });
+
+describe('budget cap and net zero goals', () => {
+  const big = () => ({ ...home(), roofAreaM2: 110, threePhase: true });
+  const pickWith = (goals: Goals, extra = false) => pickStrategies(buildGrid(usage(), big(), { ...A, exportExtra: extra }), extra, goals)[1];
+  it('keeps the recommendation within the budget when something fits', () => {
+    const r = pickWith({ cover: 0.9, exportIncome: 0, battery: 'any', maxNetCost: 9000 });
+    expect(r.netCost).toBeLessThanOrEqual(9000);
+  });
+  it('buys more cover with a bigger budget', () => {
+    const small = pickWith({ cover: 0.95, exportIncome: 0, battery: 'any', maxNetCost: 6000 });
+    const large = pickWith({ cover: 0.95, exportIncome: 0, battery: 'any', maxNetCost: 14000 });
+    expect(large.selfSufficiency).toBeGreaterThanOrEqual(small.selfSufficiency);
+    expect(large.netCost).toBeGreaterThanOrEqual(small.netCost);
+  });
+  it('says so and shows the cheapest option when nothing fits the budget', () => {
+    const r = pickWith({ cover: 0.6, exportIncome: 0, battery: 'any', maxNetCost: 500 });
+    expect(r.meetsGoals).toBe(false);
+    expect(r.blurb).toMatch(/budget/i);
+    const cheapest = Math.min(...buildGrid(usage(), big(), A).filter((x) => isFinite(x.paybackYears)).map((x) => x.netCost));
+    expect(r.netCost).toBeLessThanOrEqual(cheapest + 1);
+  });
+  it('ignores a budget of zero or none', () => {
+    const none = pickWith({ cover: 0.6, exportIncome: 0, battery: 'required' });
+    expect(pickWith({ cover: 0.6, exportIncome: 0, battery: 'required', maxNetCost: 0 }).netCost).toBe(none.netCost);
+  });
+  it('generates at least a year of use for net zero', () => {
+    const r = pickWith({ cover: 0.5, exportIncome: 0, battery: 'any', generate: 1 }, true);
+    expect(r.generationKwh).toBeGreaterThanOrEqual(r.baselineImportKwh - 1);
+    expect(r.meetsGoals).toBe(true);
+  });
+  it('uses more panels for net zero than for the same goals without it', () => {
+    const base = pickWith({ cover: 0.5, exportIncome: 0, battery: 'any' }, true);
+    const nz = pickWith({ cover: 0.5, exportIncome: 0, battery: 'any', generate: 1 }, true);
+    expect(nz.panels).toBeGreaterThanOrEqual(base.panels);
+    expect(nz.generationKwh).toBeGreaterThanOrEqual(base.generationKwh);
+  });
+  it('offers both as strategy cards, which respect their goals', () => {
+    const budget = STRATEGY_TEMPLATES.find((t) => t.key === 'budget')!, nz = STRATEGY_TEMPLATES.find((t) => t.key === 'net-zero')!;
+    expect(budget.goals(home()).maxNetCost).toBeGreaterThan(0);
+    expect(nz.goals(home()).generate).toBe(1);
+    const rb = templateResult(budget, usage(), big(), A), rn = templateResult(nz, usage(), big(), A);
+    expect(rb.netCost).toBeLessThanOrEqual(budget.goals(home()).maxNetCost!);
+    expect(rn.generationKwh).toBeGreaterThanOrEqual(rn.baselineImportKwh * 0.95);
+  });
+});

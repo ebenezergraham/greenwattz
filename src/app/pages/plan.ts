@@ -10,6 +10,7 @@ import { inferHousehold } from '../core/infer';
 import { CashChart, DayChart, Legend, MonthChart } from '../ui/charts';
 import { EstimateNote } from '../ui/estimate-note';
 import { SupportLink } from '../ui/support';
+import { planFromFile, planToFile } from '../core/plan-file';
 import { INSTALLER_CHECKLIST } from '../core/site';
 
 const STEPS = ['Usage', 'Home', 'Your plan'];
@@ -72,7 +73,7 @@ export class PlanPage {
     const g = this.s.goals(), a = this.s.assumptions(), h = this.s.home();
     return STRATEGY_TEMPLATES.find((t) => {
       const tg = t.goals(h);
-      return Math.abs(tg.cover - g.cover) < 1e-9 && tg.exportIncome === g.exportIncome && (tg.lean ?? 'balanced') === (g.lean ?? 'balanced') && (tg.battery ?? 'any') === (g.battery ?? 'any') && t.exportExtra === a.exportExtra && t.gridCharge === a.gridCharge;
+      return Math.abs(tg.cover - g.cover) < 1e-9 && tg.exportIncome === g.exportIncome && (tg.lean ?? 'balanced') === (g.lean ?? 'balanced') && (tg.battery ?? 'any') === (g.battery ?? 'any') && (tg.maxNetCost ?? 0) === (g.maxNetCost ?? 0) && (tg.generate ?? 0) === (g.generate ?? 0) && t.exportExtra === a.exportExtra && t.gridCharge === a.gridCharge;
     })?.key ?? null;
   });
   applyTemplate(t: StrategyTemplate) {
@@ -130,7 +131,7 @@ export class PlanPage {
   readonly fineSummary = computed(() => {
     const g = this.s.goals(), r = this.r(), t = this.activeTemplate();
     const name = t ? STRATEGY_TEMPLATES.find((x) => x.key === t)!.label : 'Custom goals';
-    return `${name}: ${r.panels} panels, ${r.batteryKwh ? r.batteryKwh + ' kWh battery' : 'no battery'}, aims for ${Math.round(g.cover * 100)}% supplied${g.exportIncome ? ' and ' + this.eur0(g.exportIncome) + ' export' : ''}`;
+    return `${name}: ${r.panels} panels, ${r.batteryKwh ? r.batteryKwh + ' kWh battery' : 'no battery'}, aims for ${Math.round(g.cover * 100)}% supplied${g.exportIncome ? ' and ' + this.eur0(g.exportIncome) + ' export' : ''}${g.maxNetCost ? ', within ' + this.eur0(g.maxNetCost) : ''}${g.generate ? ', net zero' : ''}`;
   });
   /** A short description of the home details tucked under "More about your home". */
   readonly homeSummary = computed(() => {
@@ -171,6 +172,43 @@ export class PlanPage {
   readonly mixNotes = computed(() => mixWarnings(this.r(), this.s.assumptions(), this.s.goals().exportIncome));
   resetMix() { this.s.chosen.set(null); }
   readonly exportGoals = [0, 600, 1200];
+  readonly budgets = [0, 8000, 10000, 12000, 15000];
+  setBudget(v: number) { this.s.chosen.set(null); this.s.goals.update((g) => ({ ...g, maxNetCost: v })); }
+  /** Net zero: ask for a year's generation to match a year's use. It needs the extra-panels choice to go past the connection limit if the home uses a lot. */
+  toggleNetZero() { this.s.chosen.set(null); this.s.goals.update((g) => ({ ...g, generate: g.generate ? 0 : 1 })); }
+  readonly planMessage = signal('');
+  /** Download the answers as a file. Nothing is stored or sent; the visitor keeps the file. */
+  savePlan() {
+    const s = this.s;
+    const text = planToFile({ mode: s.mode(), annualKwh: s.annualKwh(), monthlyBill: s.monthlyBill(), home: s.home(), assumptions: s.assumptions(), goals: s.goals(), chosen: s.chosen() });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+    a.download = 'greenwattz-plan.json';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href));
+    this.planMessage.set('Saved. Keep the file, and load it here next time. It holds your answers but no meter readings.');
+  }
+  async loadPlan(ev: Event) {
+    const input = ev.target as HTMLInputElement;
+    const f = input.files?.[0];
+    if (!f) return;
+    try {
+      const p = planFromFile(await f.text());
+      const s = this.s;
+      if (p.mode) s.mode.set(p.mode);
+      if (p.annualKwh !== undefined) s.annualKwh.set(p.annualKwh);
+      if (p.monthlyBill !== undefined) s.monthlyBill.set(p.monthlyBill);
+      if (p.home) s.home.update((h) => ({ ...h, ...p.home }));
+      if (p.assumptions) s.assumptions.update((a) => ({ ...a, ...p.assumptions }));
+      if (p.goals) s.goals.update((g) => ({ ...g, ...p.goals }));
+      if (p.chosen !== undefined) s.chosen.set(p.chosen);
+      this.planMessage.set('Plan loaded. If you had a meter file, add it again on the Usage step.');
+      this.go(2);
+    } catch (e) {
+      this.planMessage.set(e instanceof Error ? e.message : 'We could not read that file.');
+    }
+    input.value = '';
+  }
   setExportExtra(on: boolean) { this.s.chosen.set(null); this.s.patchAssumptions({ exportExtra: on }); }
   setWatts(e: Event) {
     const v = this.num(e);
