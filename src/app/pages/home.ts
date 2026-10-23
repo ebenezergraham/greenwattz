@@ -54,7 +54,7 @@ import { DayChart } from '../ui/charts';
         </div>
         <div>
           <dt>Your data stays on your device</dt>
-          <dd>Your ESB file is read in your browser. We have no server that receives it and we set no tracking cookies. <a routerLink="/privacy">How we handle data</a>.</dd>
+          <dd>Your ESB file is read in your browser and never uploaded, and we set no tracking cookies. An account is optional, and only holds what you choose to save. <a routerLink="/privacy">How we handle data</a>.</dd>
         </div>
         <div>
           <dt>Numbers you can check</dt>

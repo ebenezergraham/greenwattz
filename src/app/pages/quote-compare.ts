@@ -10,6 +10,9 @@ import { readFileText } from '../core/pdf-text';
 import { browserAiAvailability, readWithBrowserAi } from '../core/browser-ai';
 import { INCLUSIONS, acceptAiFields, mergeReads, readQuoteText, type Found, type ReadFields } from '../core/quote-check';
 import { readTerms, type TermsFields } from '../core/quote-terms';
+import { Account } from '../core/account';
+import { QuotesState } from '../core/quotes-state';
+import { defaultName } from '../core/saves';
 import { Derived, MAX_QUOTES, QuoteEntry, bestIndexes, blankEntry, derive, entryFromRead, exampleEntries, quotesFromFile, quotesToFile } from '../core/quote-compare';
 
 type Key = keyof QuoteEntry;
@@ -104,11 +107,13 @@ const ROWS: Row[] = [
         <button class="btn ghost" type="button" (click)="example()">Try an example</button>
         <span class="grow"></span>
         <button class="btn" type="button" (click)="save()" [disabled]="!entries().length">Save as file</button>
+        @if (account.enabled) { @if (account.user()) { <button class="btn" type="button" (click)="saveToAccount()" [disabled]="!entries().length || account.busy()">Save to my account</button> } @else if (account.ready()) { <a class="btn" routerLink="/account">Sign in to save</a> } }
         <label for="lf" class="btn">Load a file</label>
         <input id="lf" class="sr" type="file" accept=".json,application/json" (change)="onLoad($event)" />
         <button class="btn ghost" type="button" (click)="clear()" [disabled]="!entries().length">Clear all</button>
       </div>
       <p class="hint">Nothing is saved or sent. Quote files are read on your device. To keep your quotes, save them as a file and load it next time.@if (reading()) { <b role="status"> {{ readingText() }}</b> }</p>
+      @if (saved()) { <p class="hint" role="status">{{ saved() }}</p> }
       @if (message()) { <p class="err" role="alert"><i class="ph ph-warning-circle" aria-hidden="true"></i><span>{{ message() }}</span></p> }
 
       @if (proposal(); as p) {
@@ -258,7 +263,9 @@ export class QuoteComparePage {
   readonly rows = ROWS;
   readonly max = MAX_QUOTES;
   readonly inclusions = INCLUSIONS;
-  readonly entries = signal<QuoteEntry[]>([]);
+  readonly entries = inject(QuotesState).entries;
+  readonly account = inject(Account);
+  readonly saved = signal('');
   readonly message = signal('');
   readonly reading = signal(false);
   readonly readingText = signal('');
@@ -273,6 +280,7 @@ export class QuoteComparePage {
   readonly roundedUse = computed(() => Math.round(this.store.usage().annualKwh));
 
   constructor() {
+    this.account.restore();
     browserAiAvailability().then((a) => this.ai.set(a));
   }
 
@@ -331,6 +339,15 @@ export class QuoteComparePage {
     a.download = 'greenwattz-quotes.json';
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href));
+  }
+  async saveToAccount() {
+    const names = this.entries().map((e) => e.installer.trim()).filter(Boolean).join(', ');
+    try {
+      const name = await this.account.save('quotes', defaultName('quotes', names || `${this.entries().length} quotes`), quotesToFile(this.entries()));
+      this.saved.set(`Saved to your account as "${name}".`);
+    } catch (e) {
+      this.saved.set(e instanceof Error ? e.message : 'We could not save that.');
+    }
   }
   async onLoad(ev: Event) {
     const input = ev.target as HTMLInputElement;

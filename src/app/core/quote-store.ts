@@ -6,11 +6,12 @@
  * here never affects the visitor.
  */
 import type { LineItem, ReadFields } from './quote-check';
+import { FIREBASE_CONFIG } from './firebase-config';
 
 export const STORE = {
   projectId: 'greenwattz-eu',
   /** The Firebase web API key. It is public by design; restrict it to the Firestore API in Google Cloud. Empty keeps storage off. */
-  apiKey: '',
+  apiKey: FIREBASE_CONFIG.apiKey,
   collection: 'quotes',
 };
 

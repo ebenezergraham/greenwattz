@@ -18,7 +18,7 @@
       <!-- STEP 1 -->
       @if (step() === 1) {
         <h1>Your home</h1>
-        <p class="sub">Three answers matter most: which way your roof faces, how much room it has, and when your home was first occupied. Everything else starts with a sensible default. Your answers stay in your browser and are not sent to us.</p>
+        <p class="sub">Three answers matter most: which way your roof faces, how much room it has, and when your home was first occupied. Everything else starts with a sensible default. Your answers stay in your browser unless you choose to save them to your account.</p>
 
         <section class="grp">
           <h2>Your roof</h2>
@@ -363,6 +363,7 @@
           <a class="btn" routerLink="/check-quote">Check a quote you have</a>
           <a class="btn" routerLink="/compare-quotes">Compare your quotes</a>
           <button class="btn" type="button" (click)="savePlan()">Save my plan</button>
+          @if (account.enabled) { @if (account.user()) { <button class="btn" type="button" (click)="saveToAccount()" [disabled]="account.busy()">Save to my account</button> } @else if (account.ready()) { <a class="btn" routerLink="/account">Sign in to save</a> } }
           <label for="lp" class="btn">Load a plan</label>
           <button class="btn" type="button" (click)="print()">Save as PDF</button>
         </div>
@@ -960,7 +961,7 @@
         <div class="tot"><dt>Benefit a year</dt><dd class="num">{{ eur0(r().annualBenefit) }}</dd></div>
         <div><dt>Payback</dt><dd class="num">{{ payback(r().paybackYears) }}</dd></div>
       </dl>
-      <p class="small muted">Calculated in your browser. Not sent to us or stored.</p>
+      <p class="small muted">Calculated in your browser. Kept only if you save it to your account.</p>
     </aside>
   </div>
 </div>

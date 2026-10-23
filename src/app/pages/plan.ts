@@ -11,6 +11,9 @@ import { CashChart, DayChart, Legend, MonthChart } from '../ui/charts';
 import { EstimateNote } from '../ui/estimate-note';
 import { SupportLink } from '../ui/support';
 import { planFromFile, planToFile } from '../core/plan-file';
+import { applyPlan } from '../core/plan-apply';
+import { Account } from '../core/account';
+import { defaultName } from '../core/saves';
 import { INSTALLER_CHECKLIST } from '../core/site';
 
 const STEPS = ['Usage', 'Home', 'Your plan'];
@@ -176,7 +179,19 @@ export class PlanPage {
   setBudget(v: number) { this.s.chosen.set(null); this.s.goals.update((g) => ({ ...g, maxNetCost: v })); }
   /** Net zero: ask for a year's generation to match a year's use. It needs the extra-panels choice to go past the connection limit if the home uses a lot. */
   toggleNetZero() { this.s.chosen.set(null); this.s.goals.update((g) => ({ ...g, generate: g.generate ? 0 : 1 })); }
+  readonly account = inject(Account);
   readonly planMessage = signal('');
+  /** Save the plan to the signed-in account. Same content as the file: answers only, never meter readings. */
+  async saveToAccount() {
+    const s = this.s, r = this.r();
+    const text = planToFile({ mode: s.mode(), annualKwh: s.annualKwh(), monthlyBill: s.monthlyBill(), home: s.home(), assumptions: s.assumptions(), goals: s.goals(), chosen: s.chosen() });
+    try {
+      const name = await this.account.save('plan', defaultName('plan', `${r.panels} panels${r.batteryKwh ? ', ' + r.batteryKwh + ' kWh battery' : ''}`), text);
+      this.planMessage.set(`Saved to your account as "${name}".`);
+    } catch (e) {
+      this.planMessage.set(e instanceof Error ? e.message : 'We could not save that.');
+    }
+  }
   /** Download the answers as a file. Nothing is stored or sent; the visitor keeps the file. */
   savePlan() {
     const s = this.s;
@@ -195,13 +210,7 @@ export class PlanPage {
     try {
       const p = planFromFile(await f.text());
       const s = this.s;
-      if (p.mode) s.mode.set(p.mode);
-      if (p.annualKwh !== undefined) s.annualKwh.set(p.annualKwh);
-      if (p.monthlyBill !== undefined) s.monthlyBill.set(p.monthlyBill);
-      if (p.home) s.home.update((h) => ({ ...h, ...p.home }));
-      if (p.assumptions) s.assumptions.update((a) => ({ ...a, ...p.assumptions }));
-      if (p.goals) s.goals.update((g) => ({ ...g, ...p.goals }));
-      if (p.chosen !== undefined) s.chosen.set(p.chosen);
+      applyPlan(s, p);
       this.planMessage.set('Plan loaded. If you had a meter file, add it again on the Usage step.');
       this.go(2);
     } catch (e) {
@@ -226,6 +235,7 @@ export class PlanPage {
   }
   setHasBattery(on: boolean) { this.setBattery(on ? this.lastBattery() : 0); }
   constructor() {
+    this.account.restore();
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((q) => {
       const i = stepIndex(q.get('step'));
       this.step.set(i);

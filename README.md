@@ -76,6 +76,21 @@ Every price, grant and rate behind the estimates lives in `src/app/data/prices.j
 ## Save and load a plan
 The planner has "Save my plan" and "Load a plan" (`core/plan-file.ts`). The file holds the answers (usage figure, home, rates, goals, chosen system) and never meter readings. It is a download, not storage, so the privacy promise holds.
 
+## Accounts and saved items
+Accounts are optional. `/account` signs a visitor in with a one-time email link (no password), and "Save to my account" on the planner and the quote comparison keeps what they choose to save, so they can open it on any device.
+
+- **What is kept:** the email address, and saves: the same JSON the "Save as file" buttons produce (answers and figures only; `core/saves.ts` checks name and size). A quote file, its text and meter readings are never kept. Anonymous quote details (`core/quote-store.ts`) are kept separately and are not linked to anyone.
+- **Where it lives:** `core/account.ts` (service), `core/firebase-sdk.ts` (the only file that imports the Firebase SDK, loaded on demand so visitors who never sign in download none of it), `core/firebase-config.ts` (the public web settings), `pages/account.ts`. Saves are in Firestore at `users/{uid}/saves/{id}`; `firestore.rules` lets only that user read, write or delete them. Visitors can delete their account and every save on the account page.
+- **Browser storage:** only if someone signs in: `gw.account` (a marker so the session is restored), `gw.email` (until the link is opened) and Firebase's sign-in token. The cookie policy lists them.
+
+One-time setup in the Firebase console (project `greenwattz-eu`):
+1. **Build, Firestore Database:** create the database (a European location such as `eur3`). This also enables the Firestore API that anonymous quote details need.
+2. **Build, Authentication, Sign-in method:** turn on **Email/Password**, then switch on **Email link (passwordless sign-in)**.
+3. **Authentication, Settings, Authorized domains:** add `greenwattz.eu` (and `www.greenwattz.eu`) next to the default `greenwattz-eu.web.app`.
+4. **Authentication, Templates:** set the sign-in email's sender name and subject to GreenWattz.
+5. **Rules:** `firebase deploy --only firestore:rules`.
+6. **Google Cloud, APIs and Services, Credentials:** restrict the browser API key to your website addresses (HTTP referrers) and to the Identity Toolkit, Token Service and Cloud Firestore APIs.
+
 ## Blog and glossary
 - **Posts** are plain data in `src/app/data/posts.ts`. Add an object with a slug, title, description, date, takeaways, blocks and sources, and it appears at `/blog` and `/blog/<slug>`. Text supports `**bold**` and `[label](url)`; internal links are checked by tests.
 - **Glossary** terms live in `src/app/data/glossary.ts`. Link to a term from anywhere with `[MPRN](/glossary#mprn)`.

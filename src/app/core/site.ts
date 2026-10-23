@@ -18,7 +18,7 @@ export const SITE = {
   supportUrl: 'https://buymeacoffee.com/greenwattz.eu',
   /** Operator details shown in the privacy policy. Replace before launch. */
   operator: '[Your legal name or company], Ireland',
-  lastUpdated: '18 October 2026',
+  lastUpdated: '23 October 2026',
 };
 
 /**

@@ -13,6 +13,18 @@ service cloud.firestore {
         && (!('website' in request.resource.data) || (request.resource.data.website is string && request.resource.data.website.size() <= 120));
       allow read, update, delete: if false;
     }
+    // A signed-in visitor's saved plans and quote comparisons. Only that visitor can read, change or delete them.
+    // A save holds answers and figures as JSON, never a quote file or meter readings.
+    match /users/{uid}/saves/{id} {
+      allow read, delete: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['kind', 'name', 'dataJson', 'updatedAt'])
+        && request.resource.data.keys().hasAll(['kind', 'name', 'dataJson', 'updatedAt'])
+        && request.resource.data.kind in ['plan', 'quotes']
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 80
+        && request.resource.data.dataJson is string && request.resource.data.dataJson.size() <= 60000
+        && request.resource.data.updatedAt == request.time;
+    }
     match /{document=**} {
       allow read, write: if false;
     }
