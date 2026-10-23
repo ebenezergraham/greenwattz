@@ -1,0 +1,124 @@
+{
+  "reviewedOn": "2026-10-23",
+  "reviewEveryDays": 60,
+  "source": {
+    "label": "FairWatt solar price index",
+    "url": "https://www.fairwatt.ie/solar-price-index",
+    "note": "Anonymous, unverified quotes shared by Irish homeowners since 2025, read on 23 October 2026. Prices are per kWp, using the after-grant price where a quote shows the SEAI grant taken off. Credited to FairWatt as they ask. Ask them before using more than the headline figures."
+  },
+  "overall": {
+    "n": 97,
+    "median": 1393,
+    "low": 1237,
+    "high": 1646
+  },
+  "byBattery": [
+    {
+      "key": "none",
+      "label": "No battery",
+      "belowKwh": 0.01,
+      "n": 4,
+      "median": 1821,
+      "low": 1451,
+      "high": 2272
+    },
+    {
+      "key": "small",
+      "label": "Battery under 8 kWh",
+      "belowKwh": 8,
+      "n": 17,
+      "median": 1463,
+      "low": 1285,
+      "high": 1648
+    },
+    {
+      "key": "large",
+      "label": "Battery 8 kWh or more",
+      "belowKwh": 1000,
+      "n": 76,
+      "median": 1384,
+      "low": 1234,
+      "high": 1615
+    }
+  ],
+  "bySize": [
+    {
+      "key": "under5",
+      "label": "Under 5 kWp",
+      "belowKwp": 5,
+      "n": 14,
+      "median": 1930,
+      "low": 1677,
+      "high": 2313
+    },
+    {
+      "key": "5to8",
+      "label": "5 to 8 kWp",
+      "belowKwp": 8,
+      "n": 29,
+      "median": 1386,
+      "low": 1285,
+      "high": 1581
+    },
+    {
+      "key": "8plus",
+      "label": "8 kWp and over",
+      "belowKwp": 1000,
+      "n": 54,
+      "median": 1308,
+      "low": 1156,
+      "high": 1615
+    }
+  ],
+  "quarters": [
+    {
+      "period": "Q4 2025",
+      "n": 4,
+      "median": 1265,
+      "low": 1225,
+      "high": 1306
+    },
+    {
+      "period": "Q1 2026",
+      "n": 8,
+      "median": 1364,
+      "low": 1090,
+      "high": 1560
+    },
+    {
+      "period": "Q2 2026",
+      "n": 11,
+      "median": 1543,
+      "low": 1340,
+      "high": 1610
+    },
+    {
+      "period": "Q3 2026",
+      "n": 7,
+      "median": 1429,
+      "low": 1273,
+      "high": 1645
+    },
+    {
+      "period": "Q4 2026",
+      "n": 66,
+      "median": 1384,
+      "low": 1228,
+      "high": 1692
+    }
+  ],
+  "typicalSystem": {
+    "minKwp": 8,
+    "maxKwp": 11,
+    "minBatteryKwh": 8,
+    "maxBatteryKwh": 13,
+    "price": 11080,
+    "n": 17
+  },
+  "minQuotesPerPeriod": 3,
+  "thresholds": {
+    "farAbovePct": 0.25,
+    "minSampleToTrust": 10,
+    "maxBatteryPerKwp": 2
+  }
+}

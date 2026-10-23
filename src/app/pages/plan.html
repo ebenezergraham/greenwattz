@@ -358,6 +358,7 @@
 
         <div class="next no-print">
           <a class="btn primary" routerLink="/quote">Find installers to quote</a>
+          <a class="btn" routerLink="/check-quote">Check a quote you have</a>
           <button class="btn" type="button" (click)="print()">Save as PDF</button>
         </div>
         <p class="hint">Typical installed range before grants: {{ eur0(r().grossLow) }} to {{ eur0(r().grossHigh) }}. The yearly benefit is {{ eur0(r().billSaving) }} off your bill plus {{ eur0(r().exportIncome - r().exportTax) }} from exports{{ r().exportTax ? ' after tax' : ', tax-free' }}.</p>
@@ -905,6 +906,8 @@
           </details>
         </div>
         </section>
+
+        <support-link class="no-print" />
 
         <p class="print-only small">Estimate prepared with GreenWattz on {{ today }}. Not a quotation. Prices reviewed {{ priceDate }}. Confirm with SEAI-registered installers.</p>
         <p class="small muted fine">These are modelled estimates using a typical day for each month, not a quotation. Actual results vary with weather, installation, tariff changes and how you use power. <a routerLink="/reviews">Installer ratings</a>.</p>

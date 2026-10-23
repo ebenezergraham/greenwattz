@@ -11,6 +11,11 @@ export const SITE = {
    */
   formAccessKey: '6cddef7e-ca16-42a6-a7f3-4d465bf1759b',
   formEndpoint: 'https://api.web3forms.com/submit',
+  /**
+   * Where "Buy me a coffee" points, for example https://buymeacoffee.com/yourname. Leave empty to hide every support link.
+   * It is a plain link, so nothing loads from Buy Me a Coffee until someone clicks it.
+   */
+  supportUrl: '',
   /** Operator details shown in the privacy policy. Replace before launch. */
   operator: '[Your legal name or company], Ireland',
   lastUpdated: '18 October 2026',

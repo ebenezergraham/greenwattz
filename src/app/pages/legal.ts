@@ -27,6 +27,8 @@ import { SITE } from '../core/site';
             <tr><td>Your cookie notice choice</td><td>Your browser's local storage on this device.</td><td><b>No</b></td></tr>
             <tr><td>"Copy plan summary" and "Save as PDF"</td><td>Your clipboard or a file you save. We do not see them.</td><td><b>No</b>, unless you paste or send it somewhere</td></tr>
             <tr><td>Referral request (name, email, county, plan summary)</td><td>Sent when you press the button, through the form service Web3Forms, which emails it to {{ site.contactEmail }}.</td><td><b>Only if you submit it</b>, to Web3Forms and then us</td></tr>
+            <tr><td>A quote file you choose in the quote checker</td><td>Read in your browser. A PDF is read by a library that loads from our own site, and if your browser has built-in AI it may help read the text on your device. The file and its text are never uploaded or stored.</td><td><b>No</b></td></tr>
+            <tr><td>The "Buy me a coffee" link</td><td>A plain link. Nothing loads from Buy Me a Coffee until you click it, and then their privacy policy applies.</td><td><b>Only if you click</b></td></tr>
             <tr><td>Technical request data when a page loads: IP address, browser type, pages requested, time</td><td>Logged by our host, Google Firebase Hosting, to deliver and secure the site.</td><td><b>Yes</b>, to our host. Necessary for any website.</td></tr>
             <tr><td>Links to Trustpilot, Google Maps, SEAI, ESB Networks and installer websites</td><td>Nothing is sent when the page loads. If you click a link, that site sees your IP address and that you came from {{ site.domain }}.</td><td><b>Only if you click</b>. Their own privacy policies apply.</td></tr>
           </tbody>

@@ -24,6 +24,7 @@ const KEY = 'greenwattz.consent.v1';
           <a routerLink="/plan" routerLinkActive="on">Plan</a>
           <a routerLink="/reviews" routerLinkActive="on">Reviews</a>
           <a routerLink="/quote" routerLinkActive="on">Get quotes</a>
+          <a routerLink="/check-quote" routerLinkActive="on">Check a quote</a>
           <a routerLink="/blog" routerLinkActive="on">Guides</a>
           <a routerLink="/glossary" routerLinkActive="on">Glossary</a>
         </nav>
@@ -35,6 +36,7 @@ const KEY = 'greenwattz.consent.v1';
               <a routerLink="/plan">Plan</a>
               <a routerLink="/reviews">Reviews</a>
               <a routerLink="/quote">Get quotes</a>
+              <a routerLink="/check-quote">Check a quote</a>
               <a routerLink="/blog">Guides</a>
               <a routerLink="/glossary">Glossary</a>
               <a routerLink="/guide/esb-data">Meter data</a>
@@ -54,6 +56,7 @@ const KEY = 'greenwattz.consent.v1';
           <div class="links">
             <b>Learn</b>
             <a routerLink="/blog">Guides</a>
+            <a routerLink="/check-quote">Check a solar quote</a>
             <a routerLink="/glossary">Glossary</a>
             <a routerLink="/estimates">How we estimate</a>
             <a routerLink="/guide/esb-data">Get your ESB data</a>
@@ -64,6 +67,7 @@ const KEY = 'greenwattz.consent.v1';
             <a routerLink="/privacy">Privacy policy</a>
             <a routerLink="/cookies">Cookie policy</a>
             <button class="linklike" type="button" (click)="reopen()">Cookie settings</button>
+            @if (site.supportUrl) { <a [href]="site.supportUrl" target="_blank" rel="noopener noreferrer">Buy me a coffee</a> }
           </div>
         </div>
       </div>

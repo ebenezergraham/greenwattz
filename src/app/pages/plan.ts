@@ -9,6 +9,7 @@ import { HdfError, parseHdf } from '../core/hdf';
 import { inferHousehold } from '../core/infer';
 import { CashChart, DayChart, Legend, MonthChart } from '../ui/charts';
 import { EstimateNote } from '../ui/estimate-note';
+import { SupportLink } from '../ui/support';
 import { INSTALLER_CHECKLIST } from '../core/site';
 
 const STEPS = ['Usage', 'Home', 'Your plan'];
@@ -22,7 +23,7 @@ export function stepIndex(key: string | null): number {
 
 @Component({
   selector: 'page-plan',
-  imports: [RouterLink, DecimalPipe, DayChart, MonthChart, CashChart, EstimateNote],
+  imports: [RouterLink, DecimalPipe, DayChart, MonthChart, CashChart, EstimateNote, SupportLink],
   templateUrl: './plan.html',
   styleUrl: './plan.scss',
 })

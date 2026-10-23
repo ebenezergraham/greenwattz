@@ -61,6 +61,12 @@ Every price, grant and rate behind the estimates lives in `src/app/data/prices.j
 - **Reminder:** `.github/workflows/price-review.yml` runs monthly and opens a GitHub issue (with the checklist and source links) once a review is within 10 days of due.
 - **Stale warning:** if the file is more than `reviewEveryDays` (60) old, the site tells visitors the prices may be out of date.
 
+## Quote checker
+`/check-quote` compares a quote's price per kWp with quotes other Irish homes have shared. The comparison figures are in `src/app/data/quote-benchmarks.json` (overall, by battery size, by system size, by quarter), credited to the FairWatt solar price index with its link and date. Refresh them when you review prices; the page warns visitors when they are more than 60 days old, and `src/app/core/quote-check.spec.ts` checks the ranges stay realistic. Their page asks that anything beyond the headline figures be agreed with them first (hello@fairwatt.ie).
+
+- **Reading a quote:** a PDF or text file is read in the browser (`core/pdf-text.ts`, using pdf.js, loaded only on upload). Plain rules (`readQuoteText`) pull out panels, watts, kWp, battery, totals and grants. If the browser has built-in AI (Chrome's Prompt API, `core/browser-ai.ts`), it reads the quote too, on the device. Any number the AI returns that is not literally in the quote text is dropped (`acceptAiFields`), and every figure is shown to the user to confirm before it is used. Photos and scans are not supported.
+- **Support link:** set `supportUrl` in `core/site.ts` to your Buy Me a Coffee page. While it is empty, every support link is hidden.
+
 ## Blog and glossary
 - **Posts** are plain data in `src/app/data/posts.ts`. Add an object with a slug, title, description, date, takeaways, blocks and sources, and it appears at `/blog` and `/blog/<slug>`. Text supports `**bold**` and `[label](url)`; internal links are checked by tests.
 - **Glossary** terms live in `src/app/data/glossary.ts`. Link to a term from anywhere with `[MPRN](/glossary#mprn)`.
