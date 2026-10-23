@@ -4,6 +4,7 @@ import { DecimalPipe } from '@angular/common';
 import { EstimateNote } from '../ui/estimate-note';
 import { SupportLink } from '../ui/support';
 import { ALL, SEAI } from '../core/installers';
+import { storeQuote } from '../core/quote-store';
 import { readFileText } from '../core/pdf-text';
 import { browserAiAvailability, readWithBrowserAi } from '../core/browser-ai';
 import {
@@ -35,7 +36,7 @@ const FIELD_LABELS: { key: keyof ReadFields; label: string; unit?: string }[] = 
 
       <section class="block" aria-labelledby="read-h">
         <h2 id="read-h">Read your quote file</h2>
-        <p class="hint">Optional. Upload a PDF or text file and we read the figures in your browser, then ask you to check them. The file is never uploaded.</p>
+        <p class="hint">Optional. Upload a PDF or text file and we read the figures in your browser, then ask you to check them. The file and its text are never uploaded. When you confirm, we keep the solar specification, the price breakdown and the installer's name and website to improve our price comparison. We never keep your name, address or contact details. See the <a routerLink="/privacy">privacy policy</a>.</p>
         <div class="drop">
           <label for="qfile" class="btn"><i class="ph ph-upload-simple"></i> Choose a quote file</label>
           <input id="qfile" class="sr" type="file" accept=".pdf,.txt,.csv,application/pdf,text/plain" (change)="onFile($event)" [disabled]="reading()" />
@@ -60,6 +61,13 @@ const FIELD_LABELS: { key: keyof ReadFields; label: string; unit?: string }[] = 
                     </dd>
                   </div>
                 }
+                <div [class.missing]="!p.fields.installer">
+                  <dt><label for="f-installer">Installer</label></dt>
+                  <dd>
+                    <input id="f-installer" type="text" [value]="p.fields.installer ?? ''" (change)="editInstaller($event)" />
+                    <span class="src small muted">{{ p.fields.installer ? (p.found.installer === 'ai' ? 'Read by your browser\\'s AI' : 'Read from the text') : 'Not found' }}</span>
+                  </dd>
+                </div>
               </dl>
               @if (p.fields.priceTotal !== undefined && p.fields.priceAfterGrant !== undefined) {
                 <div class="seg" role="group" aria-label="Which price to check">
@@ -185,7 +193,7 @@ const FIELD_LABELS: { key: keyof ReadFields; label: string; unit?: string }[] = 
               <tbody>@for (c of bench.bySize; track c.key) { <tr [class.cur]="result()?.size?.key === c.key"><td>{{ c.label }}</td><td class="r num">{{ c.n }}</td><td class="r num">€{{ c.median | number: '1.0-0' }}</td><td class="r num">€{{ c.low | number: '1.0-0' }} to €{{ c.high | number: '1.0-0' }}</td></tr> }</tbody></table>
           </div>
         </div>
-        <p class="hint">Source: <a [href]="bench.source.url" target="_blank" rel="noopener noreferrer">{{ bench.source.label }}</a>, read on {{ readOn }}. {{ bench.source.note }}@if (stale) { <b> These figures are {{ age }} days old, so check the source for newer ones.</b> }</p>
+        @if (stale) { <p class="hint"><b>These figures are {{ age }} days old, so they may be out of date.</b></p> }
       </section>
 
       <support-link />
@@ -255,7 +263,6 @@ export class QuoteCheckPage {
   readonly inclusions = INCLUSIONS;
   readonly fieldLabels = FIELD_LABELS;
   readonly installerNames = [...new Set([...ALL.map((i) => i.name), ...SEAI.companies.map((c) => c.name)])].sort((a, b) => a.localeCompare(b));
-  readonly readOn = new Date(BENCHMARKS.reviewedOn + 'T00:00:00Z').toLocaleDateString('en-IE', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
   readonly age = benchmarksAgeDays();
   readonly stale = benchmarksAreStale();
 
@@ -327,7 +334,7 @@ export class QuoteCheckPage {
         browserAiAvailability().then((a) => this.ai.set(a));
       }
       const { fields, found } = mergeReads(rules, ai);
-      const count = FIELD_LABELS.filter((x) => fields[x.key] !== undefined).length;
+      const count = FIELD_LABELS.filter((x) => fields[x.key] !== undefined).length + (fields.installer ? 1 : 0);
       this.priceBasis.set(fields.priceTotal !== undefined ? 'before' : 'after');
       this.proposal.set({ fields, found, count });
     } catch {
@@ -348,11 +355,21 @@ export class QuoteCheckPage {
     this.proposal.set({ fields: fields as ReadFields, found, count: FIELD_LABELS.filter((x) => fields[x.key] !== undefined).length });
   }
 
+  editInstaller(e: Event) {
+    const raw = (e.target as HTMLInputElement).value.trim();
+    const p = this.proposal();
+    if (!p) return;
+    const fields = { ...p.fields };
+    if (raw) fields.installer = raw; else delete fields.installer;
+    this.proposal.set({ ...p, fields, found: { ...p.found, installer: 'rules' }, count: FIELD_LABELS.filter((x) => fields[x.key] !== undefined).length + (fields.installer ? 1 : 0) });
+  }
+
   /** Move what the user confirmed into the form. */
   useFound() {
     const p = this.proposal();
     if (!p) return;
     const f = p.fields;
+    void storeQuote(f, Object.keys(p.found).some((k) => p.found[k as keyof ReadFields] === 'ai') ? 'ai' : 'rules');
     const x = fieldsToInput(this.priceBasis() === 'after' && f.priceAfterGrant !== undefined ? { ...f, priceTotal: undefined } : f);
     this.panels.set(x.panels ?? null); this.watts.set(x.watts ?? null); this.kwpIn.set(x.panels && x.watts ? null : x.kwp ?? null);
     this.battery.set(x.batteryKwh ?? 0);

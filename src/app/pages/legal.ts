@@ -11,7 +11,7 @@ import { SITE } from '../core/site';
       <p class="muted">Last updated {{ site.lastUpdated }}. This is a plain-language draft; have it reviewed before launch.</p>
 
       <h2>The short version</h2>
-      <p>The planner runs in your browser. What you enter, and any smart meter file you choose, is worked out on your device. We have no database and no server that receives it. The only things that leave your browser are listed in the table below.</p>
+      <p>The planner runs in your browser. What you enter, and any smart meter file you choose, is worked out on your device. We do not keep what you enter in the planner. The only things that leave your browser are listed in the table below, including the solar details of a quote if you use the quote checker and confirm what we read.</p>
 
       <h2>Who we are</h2>
       <p>{{ site.name }} ({{ site.domain }}) is operated by {{ site.operator }}. Contact: <a [href]="'mailto:' + site.contactEmail">{{ site.contactEmail }}</a>.</p>
@@ -27,7 +27,8 @@ import { SITE } from '../core/site';
             <tr><td>Your cookie notice choice</td><td>Your browser's local storage on this device.</td><td><b>No</b></td></tr>
             <tr><td>"Copy plan summary" and "Save as PDF"</td><td>Your clipboard or a file you save. We do not see them.</td><td><b>No</b>, unless you paste or send it somewhere</td></tr>
             <tr><td>Referral request (name, email, county, plan summary)</td><td>Sent when you press the button, through the form service Web3Forms, which emails it to {{ site.contactEmail }}.</td><td><b>Only if you submit it</b>, to Web3Forms and then us</td></tr>
-            <tr><td>A quote file you choose in the quote checker</td><td>Read in your browser. A PDF is read by a library that loads from our own site, and if your browser has built-in AI it may help read the text on your device. The file and its text are never uploaded or stored.</td><td><b>No</b></td></tr>
+            <tr><td>A quote file you choose in the quote checker</td><td>The file is read in your browser. The file and its text are never uploaded. When you press "Use these figures", we send and store in our database (Google Cloud Firestore) only the solar specification (panels, watts, system and battery size), the price breakdown (the cost lines and amounts, and any SEAI grant), what the quote says is included, and the installer's name and website. We do not collect your name, address, email, phone number, Eircode or meter number, and we drop any line of the quote that contains one. We cannot link a stored quote to you.</td><td><b>Yes</b>, the solar details above, when you confirm what we read</td></tr>
+            <tr><td>Quotes you compare, and a plan you save</td><td>Kept in the page while you use it. "Save as file" and "Save my plan" download a file to your device. We never receive it, and loading it later reads it in your browser. A saved plan holds your answers but no meter readings.</td><td><b>No</b></td></tr>
             <tr><td>The "Buy me a coffee" link</td><td>A plain link. Nothing loads from Buy Me a Coffee until you click it, and then their privacy policy applies.</td><td><b>Only if you click</b></td></tr>
             <tr><td>Technical request data when a page loads: IP address, browser type, pages requested, time</td><td>Logged by our host, Google Firebase Hosting, to deliver and secure the site.</td><td><b>Yes</b>, to our host. Necessary for any website.</td></tr>
             <tr><td>Links to Trustpilot, Google Maps, SEAI, ESB Networks and installer websites</td><td>Nothing is sent when the page loads. If you click a link, that site sees your IP address and that you came from {{ site.domain }}.</td><td><b>Only if you click</b>. Their own privacy policies apply.</td></tr>
@@ -39,7 +40,7 @@ import { SITE } from '../core/site';
       <h2>What we do not do</h2>
       <ul>
         <li>No advertising, analytics or tracking cookies or scripts.</li>
-        <li>No accounts, and no database of visitors or their plans. Referral requests arrive as emails to us.</li>
+        <li>No accounts, and no database of visitors or their plans. The only data we keep is the anonymous solar details of quotes checked in the quote checker, described above. Referral requests arrive as emails to us.</li>
         <li>We do not sell, rent or share your data.</li>
         <li>We do not send your details to installers unless you ask for a referral and agree to it in our conversation. If you want a quote, you contact them yourself.</li>
       </ul>
@@ -54,13 +55,13 @@ import { SITE } from '../core/site';
       <p>The site is hosted by Google Firebase Hosting. Google acts as our processor for the technical request data above and may process it in countries outside the EEA under its standard contractual safeguards. See Google's Firebase privacy information for details and retention.</p>
 
       <h2>Legal basis</h2>
-      <p>For referral requests, your consent. For hosting logs and keeping the site secure, our legitimate interest in running a safe website. Storing your cookie choice is strictly necessary.</p>
+      <p>For referral requests, your consent. For the anonymous solar details of quotes, our legitimate interest in building an accurate comparison of Irish solar prices. For hosting logs and keeping the site secure, our legitimate interest in running a safe website. Storing your cookie choice is strictly necessary.</p>
 
       <h2>Changes</h2>
       <p>If we add features that send data off your device, such as a map or address lookup, we will tell you first on the page where it happens, ask before it runs, and update this policy.</p>
 
       <h2>Your rights</h2>
-      <p>Under the GDPR you can ask to access, correct or delete your data, object to processing, or withdraw consent by emailing us. You can complain to the Data Protection Commission at <a href="https://www.dataprotection.ie" target="_blank" rel="noopener">dataprotection.ie</a>.</p>
+      <p>Stored quote details are anonymous, so we cannot tell which one is yours and cannot look yours up. Under the GDPR you can ask to access, correct or delete your data, object to processing, or withdraw consent by emailing us. You can complain to the Data Protection Commission at <a href="https://www.dataprotection.ie" target="_blank" rel="noopener">dataprotection.ie</a>.</p>
 
       <h2>Cookies</h2>
       <p>See our <a routerLink="/cookies">cookie policy</a>.</p>

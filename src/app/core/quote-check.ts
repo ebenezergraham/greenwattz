@@ -179,12 +179,105 @@ export interface ReadFields {
   grantSolar?: number;
   grantBattery?: number;
   installer?: string;
+  /** The installer's web address, as a bare host such as "sunrise.ie". */
+  website?: string;
+  /** The price breakdown lines. No personal details are ever kept in these. */
+  items?: LineItem[];
   /** Which things the text says are included, matched from INCLUSIONS. */
   included?: string[];
 }
 export type Found = Partial<Record<keyof ReadFields, 'rules' | 'ai'>>;
 
 const num = (s: string) => parseFloat(s.replace(/,/g, ''));
+/** A decimal that may use a comma ("7,52"), as in many European quotes. */
+const dec = (s: string) => parseFloat(s.replace(',', '.'));
+/** A money amount in either style: "12,345.00", "12.345,00", "12 345" or "12345". */
+function money(token: string): number {
+  const t = token.replace(/[\s\u00a0\u202f]/g, '');
+  const last = Math.max(t.lastIndexOf(','), t.lastIndexOf('.'));
+  // The last separator is a decimal point only when 1 or 2 digits follow it.
+  if (last >= 0 && t.length - last - 1 <= 2) return parseFloat(t.slice(0, last).replace(/[.,]/g, '') + '.' + t.slice(last + 1));
+  return parseFloat(t.replace(/[.,]/g, ''));
+}
+
+const AMOUNT = String.raw`\d{1,3}(?:[\s\u00a0\u202f.,]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?`;
+const EURO_RE = new RegExp(String.raw`(?:€|\bEUR\b)\s?(${AMOUNT})|(${AMOUNT})\s?(?:€|\bEUR\b)(?!\s?\d)`, 'gi');
+/** The euro amounts on one line, in any common style. */
+export const euroAmounts = (line: string): number[] => [...line.matchAll(EURO_RE)].map((m) => money(m[1] ?? m[2])).filter((n) => n > 0);
+
+/** Anything that points at a person or a place. A line with one of these is never kept. */
+const PERSONAL = /@|https?:|www\.|\b(?:mr|mrs|ms|miss|dr)\b\.?\s|\bdear\b|customer|client|address|prepared for|quote for|quoted for|attn|attention|\btel\b|phone|mobile|mprn|gprn|eircode|\b[A-Z]\d[0-9W]\s?[A-Z0-9]{4}\b|\d{7,}/i;
+const ITEM_WORD = /panel|module|inverter|batter|storage|mounting|install|labou?r|scaffold|cabl|electrical|commission|\bber\b|monitor|optimi[sz]er|isolator|\besb\b|nc6|seai|grant|\bvat\b|subtotal|total|delivery|ev\s*charger|diverter|immersion|consumer unit|fuse|survey|design|warranty|paperwork|application|\bkwp?\b/i;
+
+export interface LineItem { label: string; amount: number }
+
+/**
+ * The price breakdown: lines that name a solar item or cost and carry a euro amount. Only lines with an item word are
+ * kept, and any line that could identify a person or a place (name, address, email, phone, Eircode, meter number) is dropped.
+ */
+export function extractBreakdown(text: string, max = 30): LineItem[] {
+  const out: LineItem[] = [];
+  const seen = new Set<string>();
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.replace(/\u00a0/g, ' ').trim();
+    if (!line || line.length > 160 || PERSONAL.test(line)) continue;
+    const amounts = euroAmounts(line);
+    if (!amounts.length) continue;
+    const label = line.replace(new RegExp(String.raw`(?:€|\bEUR\b)\s?(?:${AMOUNT})|(?:${AMOUNT})\s?(?:€|\bEUR\b)`, 'gi'), ' ').replace(/[|·•\t]+/g, ' ').replace(/\s+/g, ' ').replace(/^[\s:–-]+|[\s:–,-]+$/g, '').slice(0, 80);
+    if ((label.match(/[A-Za-z]/g) ?? []).length < 3 || !ITEM_WORD.test(label)) continue;
+    const key = `${label.toLowerCase()}|${amounts[amounts.length - 1]}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ label, amount: amounts[amounts.length - 1] });
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+const NOT_THEIR_SITE = /(?:^|\.)(?:gmail|googlemail|yahoo|hotmail|outlook|live|icloud|eircom|eir|vodafone|proton|protonmail|facebook|instagram|linkedin|twitter|x|youtube|tiktok|trustpilot|google|seai|esbnetworks|esb|gov|citizensinformation|revenue|w3|adobe|microsoft)\.[a-z.]+$/i;
+
+/** The installer's website: a web address in the quote, or the domain of a business email such as info@. Never a personal email. */
+export function detectWebsite(text: string, installer?: string): string | undefined {
+  const hosts: string[] = [];
+  for (const m of text.matchAll(/\b(?:https?:\/\/)?(?:www\.)?((?<![@\w.-])[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:ie|com|eu|co\.uk|org|net))\b(?!@)/gi)) {
+    if (/https?:\/\/|www\./i.test(m[0])) hosts.push(m[1].toLowerCase());
+  }
+  for (const m of text.matchAll(/\b(?:info|sales|quotes?|hello|admin|office|contact|enquiries|support)@((?:[a-z0-9-]+\.)+(?:ie|com|eu|co\.uk|org|net))\b/gi)) hosts.push(m[1].toLowerCase());
+  const ok = hosts.map((h) => h.replace(/^www\./, '')).filter((h) => !NOT_THEIR_SITE.test(h));
+  if (!ok.length) return undefined;
+  const words = (installer ?? '').toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 3 && !/^(?:limited|solar|energy|renewables?|electrical|ltd)$/.test(w));
+  return ok.find((h) => words.some((w) => h.includes(w))) ?? ok[0];
+}
+
+const COMPANY_WORDS = /\b(?:solar|energy|energies|renewables?|electrical|electric|power|green|pv)\b/i;
+const NOT_A_NAME = /quote|quotation|invoice|total|panel|battery|grant|price|customer|date|valid|address|phone|tel\b|email|vat|page \d/i;
+const PERSONAL_MAIL = /^(?:gmail|googlemail|yahoo|hotmail|outlook|live|icloud|eircom|eir|vodafone|proton|protonmail|me)$/i;
+const tidy = (n: string) => n.replace(/^(?:quote(?:ation)?\s+from|prepared\s+by|issued\s+by|from)\s*:?\s*/i, '').replace(/^[©\s:–-]+|[\s,.;:–-]+$/g, '').replace(/\s+/g, ' ');
+
+/**
+ * Work out who issued the quote. A name from our installer list wins. Otherwise the first company-looking line near
+ * the top (a "Ltd" or "Limited" name, or a short heading with a word like Solar or Energy), then a business email domain.
+ */
+export function detectInstaller(text: string, known: string[] = []): string | undefined {
+  const lower = text.toLowerCase();
+  const named = known.filter((n) => n.length > 4 && lower.includes(n.toLowerCase())).sort((a, b) => b.length - a.length)[0];
+  if (named) return named;
+  const top = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).slice(0, 30);
+  for (const l of top) {
+    if (l.length > 80) continue;
+    const m = l.match(/^(.*?\b(?:Ltd|Limited|Teoranta|DAC)\b\.?)/i);
+    if (m) {
+      const n = tidy(m[1]);
+      if (n.split(' ').length >= 2 && n.length <= 60 && !NOT_A_NAME.test(n)) return n;
+    }
+  }
+  for (const l of top) {
+    if (l.length <= 40 && l.length >= 5 && !/\d/.test(l) && /^[A-Z]/.test(l) && COMPANY_WORDS.test(l) && !NOT_A_NAME.test(l)) return tidy(l);
+  }
+  const mail = text.match(/\b(?:info|sales|quotes?|hello|admin|office|contact|enquiries|support)@([a-z0-9-]+)\.(?:ie|com|eu|co\.uk)\b/i);
+  if (mail && !PERSONAL_MAIL.test(mail[1])) return mail[1].replace(/(?:^|-)([a-z])/g, (_, c) => (_[0] === '-' ? ' ' : '') + c.toUpperCase());
+  return undefined;
+}
 
 /** Pull the figures we need out of quote text with plain rules. Always shown to the user to confirm. */
 export function readQuoteText(text: string, knownInstallers: string[] = []): ReadFields {
@@ -204,13 +297,13 @@ export function readQuoteText(text: string, knownInstallers: string[] = []): Rea
     const p = t.match(/(\d{1,3})\s*(?:x\s*)?(?:solar\s+)?(?:panels|modules)\b/i);
     if (p && +p[1] >= 2 && +p[1] <= 60) out.panels = +p[1];
   }
-  const kw = t.match(/(\d{1,2}(?:\.\d{1,2})?)\s*kWp?\b(?!h)/i);
-  if (kw && num(kw[1]) >= 1 && num(kw[1]) <= 30) out.kwp = num(kw[1]);
+  const kw = t.match(/(\d{1,2}(?:[.,]\d{1,2})?)\s*kWp?\b(?!h)/i);
+  if (kw && dec(kw[1]) >= 1 && dec(kw[1]) <= 30) out.kwp = dec(kw[1]);
   // Battery: a kWh figure near the word battery, else the first plausible kWh figure.
-  const kwhRe = /(\d{1,2}(?:\.\d{1,2})?)\s*kWh/gi;
+  const kwhRe = /(\d{1,2}(?:[.,]\d{1,2})?)\s*kWh/gi;
   let best: number | undefined;
   for (let m = kwhRe.exec(t); m; m = kwhRe.exec(t)) {
-    const v = num(m[1]);
+    const v = dec(m[1]);
     if (v < 2 || v > 40) continue;
     const around = t.slice(Math.max(0, m.index - 80), m.index + 80).toLowerCase();
     if (/batter|storage|luna|powerwall|sigen|givenergy/.test(around)) { best = v; break; }
@@ -219,7 +312,7 @@ export function readQuoteText(text: string, knownInstallers: string[] = []): Rea
   if (best !== undefined) out.batteryKwh = best;
   // Money, by the words on the same line.
   const lines = t.split(/\r?\n/);
-  const euros = (line: string) => [...line.matchAll(/€\s?([\d,]+(?:\.\d{1,2})?)/g)].map((m) => num(m[1])).filter((n) => n > 0);
+  const euros = euroAmounts;
   for (const raw of lines) {
     const line = raw.toLowerCase();
     const vals = euros(raw);
@@ -240,15 +333,25 @@ export function readQuoteText(text: string, knownInstallers: string[] = []): Rea
   if (has(/monitor/)) inc.push('monitor');
   if (has(/consumer unit|fuse\s*board|earth|bonding/)) inc.push('electrical');
   if (inc.length) out.included = inc;
-  const named = knownInstallers.filter((n) => n.length > 4 && lower.includes(n.toLowerCase())).sort((a, b) => b.length - a.length)[0];
-  if (named) out.installer = named;
+  const installer = detectInstaller(t, knownInstallers);
+  if (installer) out.installer = installer;
+  const website = detectWebsite(t, installer);
+  if (website) out.website = website;
+  const items = extractBreakdown(t);
+  if (items.length) out.items = items;
   return out;
 }
 
 /** Keep only AI-suggested numbers that really appear in the quote text, so a made-up figure can never reach the form. */
 export function acceptAiFields(ai: Partial<ReadFields>, text: string): ReadFields {
   const digits = text.replace(/,/g, '');
-  const appears = (v: number | undefined) => v !== undefined && Number.isFinite(v) && (digits.includes(String(v)) || digits.includes(v.toFixed(2)) || digits.includes(v.toFixed(1)));
+  const digitsDec = text.replace(/(\d),(\d{1,2})(?!\d)/g, '$1.$2').replace(/,/g, '');
+  // A figure counts only if it is positive and appears as a whole number in the text. A small model fills fields it
+  // cannot find with 0, and a bare substring check let that through because "0" is in almost every quote.
+  const appears = (v: number | undefined) => {
+    if (v === undefined || !Number.isFinite(v) || v <= 0) return false;
+    return [String(v), v.toFixed(2), v.toFixed(1)].some((s) => { const re = new RegExp(`(?<![\\d.])${s.replace('.', '\\.')}(?!\\d|\\.\\d)`); return re.test(digits) || re.test(digitsDec); });
+  };
   const out: ReadFields = {};
   for (const k of ['panels', 'watts', 'kwp', 'batteryKwh', 'priceTotal', 'priceAfterGrant', 'grantSolar', 'grantBattery'] as const) {
     const v = ai[k];

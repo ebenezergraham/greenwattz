@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   BENCHMARKS, INCLUSIONS, QuoteInput, acceptAiFields, batteryCohort, benchmarksAreStale, checkQuote, fieldsToInput, grantsFor, halfYears, mergeReads,
-  readQuoteText, sizeCohort, systemKwp,
+  detectInstaller, readQuoteText, sizeCohort, systemKwp,
 } from './quote-check';
 import { compressForAi } from './browser-ai';
 
@@ -223,6 +223,23 @@ describe('the browser AI reading', () => {
     expect(kept.priceAfterGrant).toBeUndefined();
     expect(kept.panels).toBeUndefined();
   });
+  it('drops zeros and figures that are only part of a longer number', () => {
+    const t = 'Total €12,345.00 and after grant €9,945.00, scaffold €440, 16 panels';
+    const kept = acceptAiFields({ priceTotal: 0, priceAfterGrant: 0, grantSolar: 0, grantBattery: 44, panels: 16 }, t);
+    expect(kept.priceTotal).toBeUndefined();
+    expect(kept.priceAfterGrant).toBeUndefined();
+    expect(kept.grantSolar).toBeUndefined();
+    expect(kept.grantBattery).toBeUndefined(); // 44 only occurs inside 440
+    expect(kept.panels).toBe(16);
+  });
+  it('does not let an AI zero overwrite a price the rules found', () => {
+    const rules = readQuoteText('Total price €12,345.00\nSEAI solar grant €1,800');
+    const ai = acceptAiFields({ priceTotal: 0, grantSolar: 0 }, 'Total price €12,345.00\nSEAI solar grant €1,800');
+    const { fields, found } = mergeReads(rules, ai);
+    expect(fields.priceTotal).toBe(12345);
+    expect(found.priceTotal).toBe('rules');
+    expect(fields.grantSolar).toBe(1800);
+  });
   it('keeps an installer name only if it is in the text', () => {
     expect(acceptAiFields({ installer: 'Renewables Ireland' }, text).installer).toBe('Renewables Ireland');
     expect(acceptAiFields({ installer: 'Acme Solar' }, text).installer).toBeUndefined();
@@ -276,5 +293,41 @@ describe('benchmark data', () => {
     const reviewed = new Date(b.reviewedOn + 'T00:00:00Z').getTime();
     expect(benchmarksAreStale(new Date(reviewed + b.reviewEveryDays * 86400000))).toBe(false);
     expect(benchmarksAreStale(new Date(reviewed + (b.reviewEveryDays + 1) * 86400000))).toBe(true);
+  });
+});
+
+describe('reading more of a quote', () => {
+  it('reads system size and battery written with decimal commas', () => {
+    const f = readQuoteText('16 x 470W panels, 7,52 kWp system with a 6,9 kWh battery');
+    expect(f.panels).toBe(16);
+    expect(f.watts).toBe(470);
+    expect(f.kwp).toBe(7.52);
+    expect(f.batteryKwh).toBe(6.9);
+  });
+  it('reads euro amounts in several styles', () => {
+    expect(readQuoteText('Total price: €12,345.00').priceTotal).toBe(12345);
+    expect(readQuoteText('Total price: € 12.345,00').priceTotal).toBe(12345);
+    expect(readQuoteText('Total price: 12 345 €').priceTotal).toBe(12345);
+    expect(readQuoteText('Total price EUR 9,945').priceTotal).toBe(9945);
+    expect(readQuoteText('Total after grant: 9.945,50 €').priceAfterGrant).toBe(9945.5);
+    expect(readQuoteText('SEAI battery grant: €2,400').grantBattery).toBe(2400);
+  });
+  it('does not mistake a quantity before a euro price for an amount', () => {
+    expect(readQuoteText('Total price 2 €12,345.00').priceTotal).toBe(12345);
+  });
+  it('finds an installer that is not in our list', () => {
+    expect(detectInstaller('Sunrise Energy Ltd\n12 Main Street\nQuote for Mr Murphy')).toBe('Sunrise Energy Ltd');
+    expect(detectInstaller('Quote from Bright Roofs Limited.\nTotal €9,000')).toBe('Bright Roofs Limited');
+    expect(detectInstaller('GreenPeak Solar\nQuotation 1042\nTotal €9,000')).toBe('GreenPeak Solar');
+    expect(detectInstaller('Quote\nTotal €9,000\nemail: info@sparkhome.ie')).toBe('Sparkhome');
+    expect(detectInstaller('Quote\nTotal €9,000\nsales@gmail.com')).toBeUndefined();
+  });
+  it('prefers an installer from our list when the text names one', () => {
+    expect(detectInstaller('Sunrise Energy Ltd\nAlso see Acme Renewables', ['Acme Renewables'])).toBe('Acme Renewables');
+  });
+  it('accepts AI figures that the text writes with decimal commas', () => {
+    const kept = acceptAiFields({ kwp: 7.52, batteryKwh: 6.9 }, 'System 7,52 kWp, battery 6,9 kWh');
+    expect(kept.kwp).toBe(7.52);
+    expect(kept.batteryKwh).toBe(6.9);
   });
 });

@@ -1,0 +1,20 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Quote details from the quote checker: specification, price breakdown, installer name and website.
+    // Anyone can add one document; nobody can read, change or delete from the web.
+    match /quotes/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['reader', 'installer', 'website', 'dataJson'])
+        && request.resource.data.keys().hasAll(['reader', 'dataJson'])
+        && request.resource.data.reader in ['rules', 'ai']
+        && request.resource.data.dataJson is string
+        && request.resource.data.dataJson.size() <= 6000
+        && (!('installer' in request.resource.data) || (request.resource.data.installer is string && request.resource.data.installer.size() <= 120))
+        && (!('website' in request.resource.data) || (request.resource.data.website is string && request.resource.data.website.size() <= 120));
+      allow read, update, delete: if false;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
